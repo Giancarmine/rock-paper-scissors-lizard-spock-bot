@@ -1,0 +1,36 @@
+openapi: "3.0.3"
+info:
+  title: "rock_paper_scissors_lizard_spock_bot API"
+  description: "rock_paper_scissors_lizard_spock_bot API"
+  version: "1.0.0"
+servers:
+- url: "https://rock_paper_scissors_lizard_spock_bot"
+paths:
+  /:
+    get:
+      description: ""
+      responses:
+        "200":
+          description: "OK"
+          content:
+            text/plain:
+              schema:
+                type: "string"
+              examples:
+                Example#1:
+                  value: "Hello World!"
+  /json/kotlinx-serialization:
+    get:
+      description: ""
+      responses:
+        "200":
+          description: "OK"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Map"
+components:
+  schemas:
+    Map:
+      type: "object"
+      properties: {}

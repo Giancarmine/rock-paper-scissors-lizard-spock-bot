@@ -1,0 +1,1 @@
+rootProject.name = "rock-paper-scissors-lizard-spock-bot"
