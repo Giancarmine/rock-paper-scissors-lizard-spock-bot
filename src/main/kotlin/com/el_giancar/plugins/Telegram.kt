@@ -40,7 +40,7 @@ suspend fun Application.configureTelegram() {
         println(getMe())
 
         onCommand("start") {
-            reply(it, "Hi! \uD83D\uDD25")
+            reply(it, "Hi! At the moment only /classic_game is available \uD83D\uDD25")
         }
 
         onCommand("rules") {
@@ -55,7 +55,7 @@ suspend fun Application.configureTelegram() {
             val playerMove = waitText (
                 SendTextMessage(
                     it.chat.id,
-                    "Send me your name or choose \"nope\"",
+                    "Send me your \"choose\"",
                     replyMarkup = replyKeyboard(resizeKeyboard = true, oneTimeKeyboard = true) {
                         row {
                             simpleButton("rock")
@@ -72,6 +72,18 @@ suspend fun Application.configureTelegram() {
 
             val result = classicGameSrv.play(playerMove!!)
             reply(it, result)
+            reply(
+                it,
+                replyMarkup = replyKeyboard(resizeKeyboard = true, oneTimeKeyboard = true) {
+                    row {
+                        simpleButton("/classic_game")
+                        simpleButton("/new_game")
+                        simpleButton("/commands")
+                    }
+                }
+            ) {
+                +"Use the buttons to start"
+            }
         }
 
 
