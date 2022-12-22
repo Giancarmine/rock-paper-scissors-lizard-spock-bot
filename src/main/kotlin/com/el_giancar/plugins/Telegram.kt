@@ -1,6 +1,7 @@
 package com.el_giancar.plugins
 
 import com.el_giancar.srv.ClassicGameService
+import com.el_giancar.srv.SheldonGameService
 import dev.inmo.tgbotapi.extensions.api.bot.getMe
 import dev.inmo.tgbotapi.extensions.api.send.reply
 import dev.inmo.tgbotapi.extensions.api.telegramBot
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.first
 suspend fun Application.configureTelegram() {
     val bot = telegramBot(System.getenv("TOKEN"))
     val classicGameSrv = ClassicGameService()
+    val sheldonGameSrv = SheldonGameService()
 
     val rulesMsg: String = "The rules are pretty simple which you could even memorize \uD83E\uDDE0 \n\n" +
             "- Scissors cuts Paper \n" +
@@ -75,11 +77,35 @@ suspend fun Application.configureTelegram() {
         }
 
         onCommand("sheldon_game") {
-            reply(it, "To play the Sheldon game... You have to wait that the developer implement it \uD83D\uDE05")
+            val playerMove = waitText(
+                SendTextMessage(
+                    it.chat.id,
+                    "Send me your \"choose\"",
+                    replyMarkup = replyKeyboard(resizeKeyboard = true, oneTimeKeyboard = true) {
+                        row {
+                            simpleButton("rock")
+                        }
+                        row {
+                            simpleButton("paper")
+                        }
+                        row {
+                            simpleButton("scissors")
+                        }
+                        row {
+                            simpleButton("lizard")
+                        }
+                        row {
+                            simpleButton("spock")
+                        }
+                    }
+                )
+            ).first().text.takeIf { it in arrayOf("rock", "paper", "scissors", "lizard", "spock") }
+
+            val result = sheldonGameSrv.play(playerMove!!)
+            reply(it, result)
 
             printCommandsMenu(it)
         }
-
 
         onCommand("commands") {
             printCommandsMenu(it)
