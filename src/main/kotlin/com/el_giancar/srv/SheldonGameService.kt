@@ -1,5 +1,6 @@
 package com.el_giancar.srv
 
+import com.el_giancar.model.SheldonMoveType
 import java.util.*
 
 class SheldonGameService {
@@ -18,17 +19,17 @@ class SheldonGameService {
 
         // Determine the winner
         return when {
-            playerMove == "paper" && computerMove == "rock" -> "You win! Paper covers Rock."
-            playerMove == "paper" && computerMove == "spock" -> "You win! Paper disproves Spock."
-            playerMove == "rock" && computerMove == "scissors" -> "You win! (And as it always has) Rock crushes Scissors."
-            playerMove == "rock" && computerMove == "lizard" -> "You win! Rock crushes  Lizard."
-            playerMove == "scissors" && computerMove == "paper" -> "You win! Scissors cuts Paper."
-            playerMove == "scissors" && computerMove == "lizard" -> "You win! Scissors decapitates Lizard."
-            playerMove == "lizard" && computerMove == "spock" -> "You win! Lizard poisons Spock."
-            playerMove == "lizard" && computerMove == "paper" -> "You win! Lizard eats Paper."
-            playerMove == "spock" && computerMove == "scissors" -> "You win! Spock smashes Scissors."
-            playerMove == "spock" && computerMove == "rock" -> "You win! Spock vaporizes Rock."
-            playerMove == computerMove -> "It's a tie!"
+            playerMove.equals(SheldonMoveType.PAPER.name, ignoreCase = true) && computerMove.equals(SheldonMoveType.ROCK.name, ignoreCase = true) -> "You win! Paper covers Rock."
+            playerMove.equals(SheldonMoveType.PAPER.name, ignoreCase = true) && computerMove.equals(SheldonMoveType.SPOCK.name, ignoreCase = true) -> "You win! Paper disproves Spock."
+            playerMove.equals(SheldonMoveType.ROCK.name, ignoreCase = true) && computerMove.equals(SheldonMoveType.SCISSORS.name, ignoreCase = true) -> "You win! (And as it always has) Rock crushes Scissors."
+            playerMove.equals(SheldonMoveType.ROCK.name, ignoreCase = true) && computerMove.equals(SheldonMoveType.LIZARD.name, ignoreCase = true) -> "You win! Rock crushes  Lizard."
+            playerMove.equals(SheldonMoveType.SCISSORS.name, ignoreCase = true) && computerMove.equals(SheldonMoveType.PAPER.name, ignoreCase = true) -> "You win! Scissors cuts Paper."
+            playerMove.equals(SheldonMoveType.SCISSORS.name, ignoreCase = true) && computerMove.equals(SheldonMoveType.LIZARD.name, ignoreCase = true) -> "You win! Scissors decapitates Lizard."
+            playerMove.equals(SheldonMoveType.LIZARD.name, ignoreCase = true) && computerMove.equals(SheldonMoveType.SPOCK.name, ignoreCase = true) -> "You win! Lizard poisons Spock."
+            playerMove.equals(SheldonMoveType.LIZARD.name, ignoreCase = true) && computerMove.equals(SheldonMoveType.PAPER.name, ignoreCase = true) -> "You win! Lizard eats Paper."
+            playerMove.equals(SheldonMoveType.SPOCK.name, ignoreCase = true) && computerMove.equals(SheldonMoveType.SCISSORS.name, ignoreCase = true) -> "You win! Spock smashes Scissors."
+            playerMove.equals(SheldonMoveType.SPOCK.name, ignoreCase = true) && computerMove.equals(SheldonMoveType.ROCK.name, ignoreCase = true) -> "You win! Spock vaporizes Rock."
+            playerMove.equals(computerMove, ignoreCase = true) -> "It's a tie!"
             else -> "You lose! $computerMove beats $playerMove."
         }
     }

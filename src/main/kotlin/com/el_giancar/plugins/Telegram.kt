@@ -1,5 +1,7 @@
 package com.el_giancar.plugins
 
+import com.el_giancar.model.SheldonMoveType
+import com.el_giancar.model.getNames
 import com.el_giancar.srv.ClassicGameService
 import com.el_giancar.srv.SheldonGameService
 import dev.inmo.tgbotapi.extensions.api.bot.getMe
@@ -83,23 +85,23 @@ suspend fun Application.configureTelegram() {
                     "Send me your \"choose\"",
                     replyMarkup = replyKeyboard(resizeKeyboard = true, oneTimeKeyboard = true) {
                         row {
-                            simpleButton("rock")
+                            simpleButton(SheldonMoveType.ROCK.name)
                         }
                         row {
-                            simpleButton("paper")
+                            simpleButton(SheldonMoveType.PAPER.name)
                         }
                         row {
-                            simpleButton("scissors")
+                            simpleButton(SheldonMoveType.SCISSORS.name)
                         }
                         row {
-                            simpleButton("lizard")
+                            simpleButton(SheldonMoveType.LIZARD.name)
                         }
                         row {
-                            simpleButton("spock")
+                            simpleButton(SheldonMoveType.SPOCK.name)
                         }
                     }
                 )
-            ).first().text.takeIf { it in arrayOf("rock", "paper", "scissors", "lizard", "spock") }
+            ).first().text.takeIf { it in getNames<SheldonMoveType>() }
 
             val result = sheldonGameSrv.play(playerMove!!)
             reply(it, result)
