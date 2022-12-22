@@ -13,7 +13,7 @@ class SheldonGameService {
             2 -> "scissors"
             3 -> "lizard"
             4 -> "spock"
-            else -> throw IllegalStateException("Unexpected value: ${rng.nextInt(3)}")
+            else -> throw IllegalStateException("Unexpected value: ${rng.nextInt(5)}")
         }
 
         // Determine the winner
