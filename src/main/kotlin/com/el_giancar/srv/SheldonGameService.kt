@@ -9,11 +9,11 @@ class SheldonGameService {
 
         // Generate a random move for the computer
         val computerMove = when (rng.nextInt(5)) {
-            0 -> "rock"
-            1 -> "paper"
-            2 -> "scissors"
-            3 -> "lizard"
-            4 -> "spock"
+            0 -> SheldonMoveType.ROCK.name
+            1 -> SheldonMoveType.PAPER.name
+            2 -> SheldonMoveType.SCISSORS.name
+            3 -> SheldonMoveType.LIZARD.name
+            4 -> SheldonMoveType.SPOCK.name
             else -> throw IllegalStateException("Unexpected value: ${rng.nextInt(5)}")
         }
 

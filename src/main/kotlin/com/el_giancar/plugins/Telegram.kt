@@ -1,5 +1,6 @@
 package com.el_giancar.plugins
 
+import com.el_giancar.model.ClassicMoveType
 import com.el_giancar.model.SheldonMoveType
 import com.el_giancar.model.getNames
 import com.el_giancar.srv.ClassicGameService
@@ -24,7 +25,7 @@ import io.ktor.server.application.*
 import kotlinx.coroutines.flow.first
 
 @OptIn(PreviewFeature::class)
-suspend fun Application.configureTelegram() {
+suspend fun configureTelegram() {
     val bot = telegramBot(System.getenv("TOKEN"))
     val classicGameSrv = ClassicGameService()
     val sheldonGameSrv = SheldonGameService()
@@ -46,31 +47,33 @@ suspend fun Application.configureTelegram() {
         println(getMe())
 
         onCommand("start") {
-            reply(it, "Hi! Click at \" + botCommand(\"commands\") + \" to start playing \uD83D\uDD25")
+            reply(it, "Hi! Click at /commands to start playing \uD83D\uDD25")
+            printCommandsMenu(it)
         }
 
         onCommand("rules") {
             reply(it, rulesMsg)
+            printCommandsMenu(it)
         }
 
-        onCommand("classic_game") {
+        onCommand("classic_game") { it ->
             val playerMove = waitText(
                 SendTextMessage(
                     it.chat.id,
                     "Send me your \"choose\"",
                     replyMarkup = replyKeyboard(resizeKeyboard = true, oneTimeKeyboard = true) {
                         row {
-                            simpleButton("rock")
+                            simpleButton(ClassicMoveType.ROCK.name)
                         }
                         row {
-                            simpleButton("paper")
+                            simpleButton(ClassicMoveType.PAPER.name)
                         }
                         row {
-                            simpleButton("scissors")
+                            simpleButton(ClassicMoveType.SCISSORS.name)
                         }
                     }
                 )
-            ).first().text.takeIf { it in arrayOf("rock", "paper", "scissors") }
+            ).first().text.takeIf { it in getNames<SheldonMoveType>() }
 
             val result = classicGameSrv.play(playerMove!!)
             reply(it, result)
@@ -78,7 +81,7 @@ suspend fun Application.configureTelegram() {
             printCommandsMenu(it)
         }
 
-        onCommand("sheldon_game") {
+        onCommand("sheldon_game") { it ->
             val playerMove = waitText(
                 SendTextMessage(
                     it.chat.id,
