@@ -1,11 +1,9 @@
 package com.el_giancar.model
 
-enum class SheldonMoveType(s: String) {
-    PAPER("paper"),
-    ROCK("rock"),
-    SCISSORS("scissors"),
-    LIZARD("lizard"),
-    SPOCK("spock")
+enum class SheldonMoveType {
+    PAPER,
+    ROCK,
+    SCISSORS,
+    LIZARD,
+    SPOCK
 }
-
-inline fun <reified T : Enum<T>> getNames() = enumValues<T>().map { it.name }
