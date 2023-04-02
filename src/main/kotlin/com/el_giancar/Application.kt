@@ -1,8 +1,5 @@
 package com.el_giancar
 
-import com.el_giancar.plugins.configureMonitoring
-import com.el_giancar.plugins.configureRouting
-import com.el_giancar.plugins.configureSerialization
 import com.el_giancar.plugins.configureTelegram
 import dev.inmo.micro_utils.coroutines.launchSynchronously
 import io.ktor.server.application.*
@@ -15,9 +12,5 @@ fun main() {
 }
 
 fun Application.module() {
-    configureMonitoring()
-    configureSerialization()
-    configureRouting()
-
     launchSynchronously { configureTelegram() }
 }
