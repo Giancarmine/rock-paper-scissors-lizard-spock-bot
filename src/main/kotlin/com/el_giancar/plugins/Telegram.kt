@@ -21,19 +21,18 @@ import dev.inmo.tgbotapi.types.message.content.TextContent
 import dev.inmo.tgbotapi.utils.PreviewFeature
 import dev.inmo.tgbotapi.utils.botCommand
 import dev.inmo.tgbotapi.utils.row
-import io.ktor.server.application.*
 import kotlinx.coroutines.flow.first
 
 @OptIn(PreviewFeature::class)
 suspend fun configureTelegram() {
-    val bot = telegramBot(System.getenv("TOKEN"))
+    val bot = telegramBot("5864419054:AAFi6Nbd5qIADkhpA_mBFbsos9YrK6A_u3E")
     val classicGameSrv = ClassicGameService()
     val sheldonGameSrv = SheldonGameService()
 
     val rulesMsg: String = "The rules are pretty simple which you could even memorize \uD83E\uDDE0 \n\n" +
             "- Scissors cuts Paper \n" +
             "- Paper covers Rock \n" +
-            "- Rock crushes  Lizard \n" +
+            "- Rock crushes Lizard \n" +
             "- Lizard poisons Spock\n" +
             "- Spock smashes Scissors\n" +
             "- Scissors decapitates Lizard\n" +
