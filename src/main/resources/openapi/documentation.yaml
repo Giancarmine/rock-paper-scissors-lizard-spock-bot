@@ -1,14 +1,15 @@
 openapi: "3.0.3"
 info:
-  title: "rock_paper_scissors_lizard_spock_bot API"
-  description: "rock_paper_scissors_lizard_spock_bot API"
+  title: "rock-paper-scissors-lizard-spock-bot"
+  description: >-
+    Health endpoint of the Telegram bot process. The bot itself communicates
+    through Telegram long polling and exposes no other HTTP API.
   version: "1.0.0"
-servers:
-- url: "https://rock_paper_scissors_lizard_spock_bot"
 paths:
-  /:
+  /healthz:
     get:
-      description: ""
+      summary: Liveness probe
+      description: Returns 200 when the Ktor server is running.
       responses:
         "200":
           description: "OK"
@@ -18,19 +19,4 @@ paths:
                 type: "string"
               examples:
                 Example#1:
-                  value: "Hello World!"
-  /json/kotlinx-serialization:
-    get:
-      description: ""
-      responses:
-        "200":
-          description: "OK"
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/Map"
-components:
-  schemas:
-    Map:
-      type: "object"
-      properties: {}
+                  value: "OK"

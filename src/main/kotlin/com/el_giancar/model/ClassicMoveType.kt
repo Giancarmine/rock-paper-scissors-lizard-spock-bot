@@ -5,5 +5,3 @@ enum class ClassicMoveType {
     ROCK,
     SCISSORS
 }
-
-inline fun <reified T : Enum<T>> getNames() = enumValues<T>().map { it.name }

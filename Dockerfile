@@ -1,12 +1,11 @@
 FROM gradle:7.5-jdk17 AS build
-ARG TOKEN
-COPY --chown=gradle:gradle . /home/gradle/src
 WORKDIR /home/gradle/src
-RUN gradle build --no-daemon
+COPY --chown=gradle:gradle . .
+RUN ./gradlew buildFatJar --no-daemon
 
-FROM openjdk:11
-EXPOSE 8080:8080
-ARG TOKEN
-RUN mkdir /app
-COPY --from=build /home/gradle/src/build/libs/*.jar /app/
-ENTRYPOINT ["java","-jar","/app/rock-paper-scissors-lizard-spock-bot-all.jar"]
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=build /home/gradle/src/build/libs/*-all.jar /app/app.jar
+ENV PORT=8080
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

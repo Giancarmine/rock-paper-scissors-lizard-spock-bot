@@ -34,3 +34,12 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Secrets / local environment ###
+.env
+.env.*
+!.env.example
+local.properties
+
+### OS ###
+.DS_Store
