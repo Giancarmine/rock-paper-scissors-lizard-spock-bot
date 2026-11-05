@@ -19,7 +19,7 @@ is both a changelog of the review and a list of what still needs owner action.
 | 10 | Process | No tests or CI; noisy `trace` logging | Added exhaustive service tests, a health-route test, a GitHub Actions workflow, and `info` logging. |
 | 11 | Security | Token remained recoverable from git history | History rewritten with `git filter-repo` and force-pushed; the commit contents are otherwise unchanged. |
 | 12 | Security | tgbotapi error messages contain the request URL, so runtime logs exposed the token | `logback.xml` redacts `bot<id>:<secret>` from messages and stack traces; a test guards the behavior. |
-| 13 | Availability | The free Render service sleeps after 15 minutes without traffic, stopping long polling | `keepalive.yml` pings `/healthz` every 5 minutes; documented in `DEPLOYMENT.md`. |
+| 13 | Availability | The free Render service sleeps after 15 minutes without traffic, stopping long polling | `keepalive.yml` pings `/healthz` every 5 minutes; documented in `DEPLOYMENT.md`. The job allows 10 minutes and the curl retries allow 8m45s, so a cold start is not cancelled mid-wake-up. |
 | 14 | UX / Architecture | User-facing prose lived in the game services, move labels were enum names, `TelegramBot` mixed wiring/parsing/flow, and an abandoned game locked the chat forever | Services return typed `RoundResult`; `Messages.kt` renders all text; moves have `displayName`; `GameFlow` + `MoveParser` split the adapter; games time out after two minutes. |
 
 ## Still requires owner action

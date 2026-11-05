@@ -2,7 +2,17 @@ name: Keep alive
 
 # Render's free plan stops a web service after 15 minutes without inbound
 # traffic. This scheduled ping keeps the bot awake while staying on the free
-# tier. A cold start can take about a minute, so the request timeout is generous.
+# tier.
+#
+# Budgets must line up so a cold start is not killed halfway:
+#   curl worst case = (retry + 1) * max-time + retry * retry-delay
+#                   = 4 * 120s + 3 * 15s = 525s (8m45s)
+#   job timeout     = 10min, leaving room for runner setup and teardown.
+# Keep the job timeout comfortably above the curl budget if you change either.
+#
+# cancel-in-progress is false on purpose: a ping that is waiting for a sleeping
+# service to wake up must be allowed to finish. A scheduled run that arrives in
+# the meantime waits (at most one is queued) instead of cancelling the wake-up.
 #
 # Forks and clones: change HEALTHCHECK_URL to your own Render URL (or remove
 # this workflow if you do not host the bot on Render's free plan).
@@ -16,12 +26,12 @@ permissions: {}
 
 concurrency:
   group: render-keepalive
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Ping the health endpoint
         env:
@@ -29,9 +39,10 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --silent --show-error \
-            --max-time 150 \
+            --connect-timeout 30 \
+            --max-time 120 \
             --retry 3 \
-            --retry-delay 10 \
+            --retry-delay 15 \
             --retry-all-errors \
             "$HEALTHCHECK_URL"
           echo "Health check succeeded."
