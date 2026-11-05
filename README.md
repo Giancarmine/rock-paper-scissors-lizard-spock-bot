@@ -85,8 +85,8 @@ export PORT=8080          # optional
 ```
 
 > `BOT_TOKEN` is required at runtime. `.env` is git-ignored; never commit a real
-> token. A token was previously committed to this repository and should be rotated
-> with @BotFather.
+> token. The previously committed token was purged from git history, but tokens are
+> compromised once exposed — rotate if a copy still exists anywhere.
 
 ### Run locally
 
@@ -156,15 +156,29 @@ src/test/kotlin/com/el_giancar/srv/
 - No timeout for an abandoned game; the chat stays locked until the user answers or
   sends a command.
 - The OpenAPI document is descriptive only and is not served by the application.
-- A previously committed bot token remains in git history; rotate it and consider
-  purging history with owner approval.
+- The previously committed bot token was purged from git history, but it must still
+  be treated as compromised and rotated with @BotFather.
 
 See [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) for details.
+
+## Deployment
+
+The bot runs as a Docker web service on [Render](https://render.com/). Pushing a
+`v*` tag or running the **Deploy to Render** workflow:
+
+1. Updates the service's `BOT_TOKEN` environment variable from the
+   `BOT_TOKEN` GitHub secret.
+2. Triggers a Render deploy.
+
+`BOT_TOKEN` is never committed or baked into the image. One-time setup, the required
+GitHub secrets/variables, and the token-rotation runbook are documented in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ## Documentation for contributors and AI agents
 
 - [`AGENTS.md`](AGENTS.md) — instructions for AI coding agents.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — components and update flow.
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Render setup and token rotation.
 - [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) — status of reviewed findings.
 
 ## License

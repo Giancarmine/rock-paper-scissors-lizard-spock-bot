@@ -17,22 +17,25 @@ both a changelog of the review and a list of what still needs owner action.
 | 8 | Correctness | Unreachable `else` branches re-rolled the RNG | Replaced by a single `error(...)` path in rule lookup. |
 | 9 | API surface | OpenAPI spec described non-existent routes; no health endpoint | Added `GET /healthz`; the spec now documents only that endpoint. |
 | 10 | Process | No tests or CI; noisy `trace` logging | Added exhaustive service tests, a health-route test, a GitHub Actions workflow, and `info` logging. |
+| 11 | Security | Token remained recoverable from git history | History rewritten with `git filter-repo` and force-pushed; the commit contents are otherwise unchanged. |
 
 ## Still requires owner action
 
 ### Rotate the leaked token (high priority)
 
-The token that used to be hardcoded is still recoverable from git history (commit
-`d1be367`). Removing it from the working tree does not revoke it.
+The token that used to be hardcoded has been purged from every commit, but a token
+that was ever committed must be treated as compromised. Forks, existing clones, and
+caches may retain it.
 
 1. Revoke the token in [@BotFather](https://t.me/BotFather) and issue a new one.
-2. Set the new token as `BOT_TOKEN` in the runtime environment / platform secret
-   store.
-3. Optionally purge history with `git filter-repo` and force-push — only with
-   explicit approval and coordination with everyone who has a clone.
+2. Store it as the GitHub secret: `gh secret set BOT_TOKEN`.
+3. Run `gh workflow run deploy-render.yml` to update the Render environment variable
+   and redeploy.
+4. Verify `/healthz` and send `/start` to the bot.
 
-Until rotation happens, assume the old token is usable by anyone with repository
-access.
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the full setup (Render API key and service
+ID) and the rotation runbook. History is already purged; do not rewrite it again
+without explicit approval and coordination with everyone who has a clone.
 
 ## Remaining limitations (accepted for now)
 
@@ -56,10 +59,12 @@ access.
 ## Verification performed
 
 - Source review of all Kotlin files, Gradle files, Dockerfile, and resources.
-- `grep` for the old token: present only in `.git` history, not in tracked files.
+- `grep` for the old token: absent from tracked files and from every commit after the
+  `git filter-repo` rewrite; the rewritten HEAD tree matches the pre-rewrite tree.
 - Unit tests added for all 9 classic pairs and all 25 Sheldon pairs, plus canonical
   phrase checks, and a `testApplication` check for `GET /healthz`.
 - `./gradlew clean test buildFatJar` passes with Temurin JDK 17; the fat jar starts
   and fails fast with a clear message when `BOT_TOKEN` is missing.
+- The `/healthz` route was smoke-tested against a running fat jar.
 - Runtime smoke test of the Telegram path requires a valid token and was not
   performed.

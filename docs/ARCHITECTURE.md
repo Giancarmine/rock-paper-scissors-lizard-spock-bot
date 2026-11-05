@@ -15,8 +15,9 @@ flowchart LR
 ```
 
 The bot is an outbound-only client of the Telegram Bot API. It does not expose a
-webhook, so it can run behind NAT or on a PaaS without a public URL. The Ktor server
-binds `0.0.0.0:$PORT` (default 8080) and serves only `GET /healthz`.
+webhook, so it can run behind NAT or on a PaaS without a public URL. It is deployed
+to Render as a Docker web service; the Ktor server binds `0.0.0.0:$PORT` (Render
+provides `PORT`, default 8080) and serves only `GET /healthz`.
 
 ## Components
 
@@ -29,6 +30,8 @@ binds `0.0.0.0:$PORT` (default 8080) and serves only `GET /healthz`.
 | Tests | `src/test/kotlin/com/el_giancar/srv/*Test.kt` | Exhaustive pair tables and canonical phrase checks. |
 | Logging | `src/main/resources/logback.xml` | Console appender; root level `info`. |
 | API spec | `src/main/resources/openapi/documentation.yaml` | Description of `/healthz`; not referenced by code. |
+| CI | `.github/workflows/ci.yml` | Builds and tests on push/PR. |
+| Deploy | `.github/workflows/deploy-render.yml` | Updates `BOT_TOKEN` on Render and triggers a deploy. |
 
 ## Startup sequence
 
@@ -139,30 +142,35 @@ This keeps tests free of randomness. The random overload picks with
 
 ## Deployment
 
+The bot is deployed to **Render** as a Docker web service. GitHub Actions drives the
+release: it pushes the current `BOT_TOKEN` secret to Render, then triggers a deploy.
+Details and the one-time setup are in [`DEPLOYMENT.md`](DEPLOYMENT.md).
+
 ```mermaid
 flowchart TB
-    subgraph Build[Build stage: gradle:7.5-jdk17]
-        A[Copy repo] --> B[./gradlew buildFatJar]
-    end
-    subgraph Runtime[Runtime stage: eclipse-temurin:17-jre]
-        C[/app/app.jar] --> D[java -jar /app/app.jar]
-    end
-    B --> C
-    D --> E[Ktor 0.0.0.0:8080<br/>GET /healthz]
-    D --> F[Telegram long polling]
-    G[BOT_TOKEN env] --> D
-    H[PORT env, default 8080] --> D
+    Dev[git push / v* tag / manual dispatch] --> GHA[GitHub Actions<br/>deploy-render.yml]
+    GHA -->|PUT env-vars/BOT_TOKEN| RenderAPI[Render API]
+    GHA -->|POST deploys| RenderAPI
+    RenderAPI --> Render[Render Docker web service]
+    Render --> Build[Build stage: gradle buildFatJar]
+    Build --> Runtime[Runtime: java -jar /app/app.jar]
+    Runtime --> Health[Ktor 0.0.0.0:$PORT<br/>GET /healthz]
+    Runtime --> Poll[Telegram long polling]
+    Secret[GitHub secret BOT_TOKEN] --> GHA
+    Secret -.->|stored as env var| Runtime
 ```
 
 Notes:
 
 - The Dockerfile copies `build/libs/*-all.jar` to a stable `/app/app.jar`, avoiding
   coupling to the project version in the file name.
-- The token is injected at runtime with `-e BOT_TOKEN=...` (or the platform's secret
-  store); it is not a build argument and is not baked into the image.
-- Build and runtime both use JDK 17.
-- The original deployment target was Render.com; any platform that allows a
-  long-running process and outbound HTTPS is sufficient.
+- The token is injected at runtime as the Render environment variable `BOT_TOKEN`; it
+  is never a build argument and is never baked into the image.
+- CI (`.github/workflows/ci.yml`) builds and tests every push/PR. The deploy workflow
+  (`.github/workflows/deploy-render.yml`) runs on `v*` tags or manual dispatch.
+- Build and runtime both use JDK 17. Render supplies `PORT` and probes `/healthz`.
+- The bot only needs a long-running process and outbound HTTPS to `api.telegram.org`;
+  this architecture works on any comparable PaaS.
 
 ## Design decisions
 

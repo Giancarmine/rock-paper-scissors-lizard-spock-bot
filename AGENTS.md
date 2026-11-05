@@ -14,9 +14,10 @@ working in this repository. Read this before changing code.
   for Telegram, Logback for logging.
 - **Build:** Gradle 7.5.1 via the committed wrapper (`./gradlew`).
 - **Size:** 6 Kotlin source files, 3 test files, GitHub Actions CI, no persistence.
-- **Deployment:** single Docker image; the bot uses Telegram **long polling**, so it
-  needs no public URL or webhook. An HTTP `/healthz` endpoint exists for platforms
-  that require one.
+- **Deployment:** single Docker image on **Render** (Docker web service, health check
+  `/healthz`). The bot uses Telegram **long polling**, so no webhook is required.
+  `.github/workflows/deploy-render.yml` pushes `secrets.BOT_TOKEN` to Render and
+  triggers a deploy.
 
 Repository root is the directory containing this file.
 
@@ -35,11 +36,15 @@ Rules for agents:
 1. **Never** print, copy, log, echo, or commit real secrets. Use `BOT_TOKEN` /
    `<your-token>` placeholders in docs, tests, fixtures, and commit messages.
 2. `.env` is git-ignored; `.env.example` documents the variable names.
-3. A real token was previously hardcoded in this repository and remains in git
-   history. It must be treated as compromised and rotated via
-   [@BotFather](https://t.me/BotFather). Do **not** rewrite history unless the owner
-   explicitly asks.
-4. Do not add tokens to `Dockerfile`, `build.gradle.kts`, or source files.
+3. The old token was purged from git history with `git filter-repo`, but a token
+   that was ever committed must still be treated as compromised and rotated via
+   [@BotFather](https://t.me/BotFather). Do **not** rewrite history again unless the
+   owner explicitly asks.
+4. Do not add tokens to `Dockerfile`, `build.gradle.kts`, source files, or workflow
+   files.
+5. Production tokens live in GitHub Actions secrets: `BOT_TOKEN`,
+   `RENDER_API_KEY`, plus the `RENDER_SERVICE_ID` repository variable. The deploy
+   workflow copies `BOT_TOKEN` to Render at deploy time.
 
 ## Quick start
 
@@ -98,6 +103,8 @@ Application.kt                 main(): reads BOT_TOKEN/PORT, starts Ktor
 | `src/main/resources/openapi/documentation.yaml` | Documents the `/healthz` endpoint (not served by Ktor). |
 | `Dockerfile`, `.dockerignore` | Two-stage JDK 17 build, fat jar runtime. |
 | `.github/workflows/ci.yml` | CI: `./gradlew build buildFatJar` on Temurin 17. |
+| `.github/workflows/deploy-render.yml` | Updates `BOT_TOKEN` on Render and triggers a deploy. |
+| `docs/DEPLOYMENT.md` | Render setup, secrets, and token-rotation runbook. |
 | `build.gradle.kts`, `gradle.properties` | Dependencies and versions. |
 
 ### Telegram update flow
@@ -170,8 +177,8 @@ the map once — losses are derived from the same map.
 - The OpenAPI YAML is documentation only; no Ktor route serves it.
 - `getNames<T>()` was removed together with string-based parsing. Do not reintroduce
   it unless it has a real caller.
-- The old bot token is still recoverable from git history; rotation is an owner
-  action.
+- The old bot token was removed from all commits, but copies/forks/caches may still
+  contain it; rotation is an owner action.
 
 ## Common tasks
 
@@ -206,12 +213,16 @@ Read environment variables at startup in `configureTelegram()` or `main()`, fail
 fast with a clear message, and update `.env.example`, `README.md`, and `AGENTS.md`.
 Never add a default token.
 
-### Rotate the leaked token
+### Rotate the bot token
 
 1. Revoke the old token and create a new one with @BotFather (owner action).
-2. Set `BOT_TOKEN` in the runtime environment.
-3. Optional history purge (`git filter-repo`) only with explicit owner approval and
-   coordination with all clones.
+2. Store it as the GitHub secret: `gh secret set BOT_TOKEN`.
+3. Run the deploy workflow: `gh workflow run deploy-render.yml`. It updates the
+   Render environment variable and redeploys.
+4. Verify `/healthz` and send `/start` to the bot.
+
+See `docs/DEPLOYMENT.md`. History was already purged; do not rewrite it again without
+explicit owner approval and coordination with all clones.
 
 ## Verification checklist
 
@@ -226,13 +237,14 @@ Before declaring a change done:
 ## Out of scope unless asked
 
 - Force-pushing, rewriting history, deleting branches, or publishing releases.
-- Expanding CI into deploy/release workflows, or adding databases, Docker Compose,
-  or a web dashboard.
+- Reworking the deploy workflow in `.github/workflows/deploy-render.yml`, or adding
+  databases, Docker Compose, or a web dashboard.
 - Refactoring the whole bot in one change.
 
 ## Related documents
 
 - `README.md` — human-facing overview and run instructions.
 - `docs/ARCHITECTURE.md` — deeper design and flow.
+- `docs/DEPLOYMENT.md` — Render setup, GitHub secrets, and token rotation.
 - `docs/KNOWN_ISSUES.md` — current status of known findings.
 - `.github/copilot-instructions.md` — short pointer for GitHub Copilot.
