@@ -158,7 +158,8 @@ src/main/resources/
 src/test/kotlin/com/el_giancar/
 ├── application/                       # game-rule tests
 ├── config/                            # environment config tests
-└── infrastructure/http/               # /healthz route test
+├── infrastructure/http/               # /healthz route test
+└── infrastructure/logging/            # log redaction test
 ```
 
 ## Known limitations
@@ -167,6 +168,11 @@ src/test/kotlin/com/el_giancar/
 - No timeout for an abandoned game; the chat stays locked until the user answers or
   sends a command.
 - The OpenAPI document is descriptive only and is not served by the application.
+- On Render's free plan the service sleeps without traffic; the scheduled keep-alive
+  workflow mitigates this, but scheduled runs can be delayed.
+- tgbotapi logs a timeout every 30 seconds while the bot is idle because its client
+  request timeout equals Telegram's long-poll timeout. Log output redacts the bot
+  token; the polling loop recovers on the next request.
 - The previously committed bot token was purged from git history, but it must still
   be treated as compromised and rotated with @BotFather.
 
@@ -184,6 +190,19 @@ The bot runs as a Docker web service on [Render](https://render.com/). Pushing a
 `BOT_TOKEN` is never committed or baked into the image. One-time setup, the required
 GitHub secrets/variables, and the token-rotation runbook are documented in
 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+### Free plan
+
+The service stays on Render's **free** plan. Free web services stop after 15 minutes
+without inbound traffic, which would also stop Telegram long polling, so
+[`.github/workflows/keepalive.yml`](.github/workflows/keepalive.yml) pings
+`/healthz` every 5 minutes. One always-on free service uses under the monthly
+instance-hour allowance. GitHub can delay scheduled runs, so a message sent right
+after a rare sleep may wait until the next successful ping; Telegram keeps updates
+for 24 hours, so nothing is lost.
+
+Update `HEALTHCHECK_URL` in that workflow if the Render URL changes (for example in
+a fork).
 
 ## Documentation for contributors and AI agents
 

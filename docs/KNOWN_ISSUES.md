@@ -1,7 +1,7 @@
 # Known issues and findings
 
-Status as of 2026-11-04 against `main` plus the remediation change. This document is
-both a changelog of the review and a list of what still needs owner action.
+Status as of 2026-11-05 against `main` plus the remediation changes. This document
+is both a changelog of the review and a list of what still needs owner action.
 
 ## Resolved in the remediation change
 
@@ -18,6 +18,8 @@ both a changelog of the review and a list of what still needs owner action.
 | 9 | API surface | OpenAPI spec described non-existent routes; no health endpoint | Added `GET /healthz`; the spec now documents only that endpoint. |
 | 10 | Process | No tests or CI; noisy `trace` logging | Added exhaustive service tests, a health-route test, a GitHub Actions workflow, and `info` logging. |
 | 11 | Security | Token remained recoverable from git history | History rewritten with `git filter-repo` and force-pushed; the commit contents are otherwise unchanged. |
+| 12 | Security | tgbotapi error messages contain the request URL, so runtime logs exposed the token | `logback.xml` redacts `bot<id>:<secret>` from messages and stack traces; a test guards the behavior. |
+| 13 | Availability | The free Render service sleeps after 15 minutes without traffic, stopping long polling | `keepalive.yml` pings `/healthz` every 5 minutes; documented in `DEPLOYMENT.md`. |
 
 ## Still requires owner action
 
@@ -27,11 +29,17 @@ The token that used to be hardcoded has been purged from every commit, but a tok
 that was ever committed must be treated as compromised. Forks, existing clones, and
 caches may retain it.
 
+The current token was also pasted into chat and appeared in Render runtime logs:
+tgbotapi includes the request URL (with the token) in error messages. The application
+now redacts `bot<id>:<secret>` in `logback.xml`, but the token that was already logged
+must be rotated. Treat the current value as compromised.
+
 1. Revoke the token in [@BotFather](https://t.me/BotFather) and issue a new one.
 2. Store it as the GitHub secret: `gh secret set BOT_TOKEN`.
 3. Run `gh workflow run deploy-render.yml` to update the Render environment variable
    and redeploy.
 4. Verify `/healthz` and send `/start` to the bot.
+5. Check Render logs for `bot<redacted>` and no token value.
 
 See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the full setup (Render API key and service
 ID) and the rotation runbook. History is already purged; do not rewrite it again
@@ -48,6 +56,14 @@ without explicit approval and coordination with everyone who has a clone.
   over HTTP, add a route.
 - **No Telegram API retry/backoff.** Network errors propagate to the handler
   coroutine.
+- **Idle long-poll timeouts.** tgbotapi 37 sets the HTTP request timeout equal to
+  Telegram's long-poll timeout, so an idle bot logs
+  `HttpRequestTimeoutException` roughly every 30 seconds. The polling loop retries
+  and updates are not lost. The log redaction pattern keeps the token out of those
+  messages.
+- **Render free-plan sleep.** The service stops after 15 minutes without inbound
+  traffic. `.github/workflows/keepalive.yml` pings `/healthz` every 5 minutes, but
+  GitHub can delay scheduled runs. Updates remain queued in Telegram for 24 hours.
 - **The per-chat mutex map is never evicted.** Entries are small, but the map grows
   with the number of distinct chats seen since startup.
 - **`/cancel` is not a registered command.** During a game any command cancels, but
@@ -66,5 +82,9 @@ without explicit approval and coordination with everyone who has a clone.
 - `./gradlew clean test buildFatJar` passes with Temurin JDK 21; the fat jar starts
   and fails fast with a clear message when `BOT_TOKEN` is missing.
 - The `/healthz` route was smoke-tested against a running fat jar.
+- The logback configuration is tested with a fake bot token in a message and a stack
+  trace; the output contains `bot<redacted>` and not the token.
+- Render deploy `dep-dbm7vl942hec73dtvg3g` (commit `a93437c`) reached **Live** and
+  `/healthz` returned `200 OK`.
 - Runtime smoke test of the Telegram path requires a valid token and was not
   performed.
