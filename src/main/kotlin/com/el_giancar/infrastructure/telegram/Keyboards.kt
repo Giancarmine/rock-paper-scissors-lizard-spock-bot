@@ -1,5 +1,6 @@
 package com.el_giancar.infrastructure.telegram
 
+import com.el_giancar.domain.Move
 import dev.inmo.tgbotapi.extensions.utils.types.buttons.replyKeyboard
 import dev.inmo.tgbotapi.extensions.utils.types.buttons.simpleButton
 import dev.inmo.tgbotapi.types.buttons.ReplyKeyboardMarkup
@@ -21,13 +22,13 @@ internal fun commandsKeyboard(): ReplyKeyboardMarkup = replyKeyboard(
     }
 }
 
-internal fun <T : Enum<T>> movesKeyboard(moves: List<T>): ReplyKeyboardMarkup = replyKeyboard(
+internal fun <M : Move> movesKeyboard(moves: List<M>): ReplyKeyboardMarkup = replyKeyboard(
     resizeKeyboard = true,
     oneTimeKeyboard = true,
 ) {
     moves.forEach { move ->
         row {
-            simpleButton(move.name)
+            simpleButton(move.displayName)
         }
     }
 }

@@ -1,8 +1,11 @@
 package com.el_giancar.application
 
 import com.el_giancar.domain.ClassicMoveType
+import com.el_giancar.domain.GameOutcome
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ClassicGameServiceTest {
@@ -17,18 +20,23 @@ class ClassicGameServiceTest {
         )
 
         for (player in ClassicMoveType.entries) {
-            for (computer in ClassicMoveType.entries) {
-                val result = service.play(player, computer)
+            for (bot in ClassicMoveType.entries) {
+                val result = service.play(player, bot)
+                assertEquals(player, result.playerMove)
+                assertEquals(bot, result.botMove)
                 when {
-                    player == computer -> assertEquals("It's a tie!", result)
-                    computer in wins.getValue(player) -> assertTrue(
-                        result.startsWith("You win!"),
-                        "Expected a win for $player vs $computer, got: $result"
-                    )
-                    else -> assertTrue(
-                        result.startsWith("You lose!"),
-                        "Expected a loss for $player vs $computer, got: $result"
-                    )
+                    player == bot -> {
+                        assertEquals(GameOutcome.TIE, result.outcome)
+                        assertNull(result.rulePhrase)
+                    }
+                    bot in wins.getValue(player) -> {
+                        assertEquals(GameOutcome.WIN, result.outcome)
+                        assertNotNull(result.rulePhrase)
+                    }
+                    else -> {
+                        assertEquals(GameOutcome.LOSE, result.outcome)
+                        assertNotNull(result.rulePhrase)
+                    }
                 }
             }
         }
@@ -36,26 +44,26 @@ class ClassicGameServiceTest {
 
     @Test
     fun `uses the canonical winning phrases`() {
-        assertEquals(
-            "You win! Rock crushes Scissors.",
-            service.play(ClassicMoveType.ROCK, ClassicMoveType.SCISSORS)
-        )
-        assertEquals(
-            "You lose! Paper covers Rock.",
-            service.play(ClassicMoveType.ROCK, ClassicMoveType.PAPER)
-        )
+        val win = service.play(ClassicMoveType.ROCK, ClassicMoveType.SCISSORS)
+        assertEquals(GameOutcome.WIN, win.outcome)
+        assertEquals("Rock crushes Scissors", win.rulePhrase)
+
+        val loss = service.play(ClassicMoveType.ROCK, ClassicMoveType.PAPER)
+        assertEquals(GameOutcome.LOSE, loss.outcome)
+        assertEquals("Paper covers Rock", loss.rulePhrase)
     }
 
     @Test
     fun `random play returns a valid result`() {
         repeat(20) {
             val result = service.play(ClassicMoveType.ROCK)
-            assertTrue(
-                result == "It's a tie!" ||
-                    result.startsWith("You win!") ||
-                    result.startsWith("You lose!"),
-                "Unexpected result: $result"
-            )
+            assertEquals(ClassicMoveType.ROCK, result.playerMove)
+            assertTrue(result.botMove in ClassicMoveType.entries)
+            if (result.outcome == GameOutcome.TIE) {
+                assertNull(result.rulePhrase)
+            } else {
+                assertNotNull(result.rulePhrase)
+            }
         }
     }
 }

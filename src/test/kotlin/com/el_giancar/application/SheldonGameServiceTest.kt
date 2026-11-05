@@ -1,8 +1,11 @@
 package com.el_giancar.application
 
+import com.el_giancar.domain.GameOutcome
 import com.el_giancar.domain.SheldonMoveType
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SheldonGameServiceTest {
@@ -19,18 +22,23 @@ class SheldonGameServiceTest {
         )
 
         for (player in SheldonMoveType.entries) {
-            for (computer in SheldonMoveType.entries) {
-                val result = service.play(player, computer)
+            for (bot in SheldonMoveType.entries) {
+                val result = service.play(player, bot)
+                assertEquals(player, result.playerMove)
+                assertEquals(bot, result.botMove)
                 when {
-                    player == computer -> assertEquals("It's a tie!", result)
-                    computer in wins.getValue(player) -> assertTrue(
-                        result.startsWith("You win!"),
-                        "Expected a win for $player vs $computer, got: $result"
-                    )
-                    else -> assertTrue(
-                        result.startsWith("You lose!"),
-                        "Expected a loss for $player vs $computer, got: $result"
-                    )
+                    player == bot -> {
+                        assertEquals(GameOutcome.TIE, result.outcome)
+                        assertNull(result.rulePhrase)
+                    }
+                    bot in wins.getValue(player) -> {
+                        assertEquals(GameOutcome.WIN, result.outcome)
+                        assertNotNull(result.rulePhrase)
+                    }
+                    else -> {
+                        assertEquals(GameOutcome.LOSE, result.outcome)
+                        assertNotNull(result.rulePhrase)
+                    }
                 }
             }
         }
@@ -38,26 +46,26 @@ class SheldonGameServiceTest {
 
     @Test
     fun `uses the canonical winning phrases`() {
-        assertEquals(
-            "You win! Spock vaporizes Rock.",
-            service.play(SheldonMoveType.SPOCK, SheldonMoveType.ROCK)
-        )
-        assertEquals(
-            "You lose! Lizard poisons Spock.",
-            service.play(SheldonMoveType.SPOCK, SheldonMoveType.LIZARD)
-        )
+        val win = service.play(SheldonMoveType.SPOCK, SheldonMoveType.ROCK)
+        assertEquals(GameOutcome.WIN, win.outcome)
+        assertEquals("Spock vaporizes Rock", win.rulePhrase)
+
+        val loss = service.play(SheldonMoveType.SPOCK, SheldonMoveType.LIZARD)
+        assertEquals(GameOutcome.LOSE, loss.outcome)
+        assertEquals("Lizard poisons Spock", loss.rulePhrase)
     }
 
     @Test
     fun `random play returns a valid result`() {
         repeat(20) {
             val result = service.play(SheldonMoveType.SPOCK)
-            assertTrue(
-                result == "It's a tie!" ||
-                    result.startsWith("You win!") ||
-                    result.startsWith("You lose!"),
-                "Unexpected result: $result"
-            )
+            assertEquals(SheldonMoveType.SPOCK, result.playerMove)
+            assertTrue(result.botMove in SheldonMoveType.entries)
+            if (result.outcome == GameOutcome.TIE) {
+                assertNull(result.rulePhrase)
+            } else {
+                assertNotNull(result.rulePhrase)
+            }
         }
     }
 }
