@@ -19,6 +19,7 @@ is both a changelog of the review and a list of what still needs owner action.
 | 10 | Process | No tests or CI; noisy `trace` logging | Added exhaustive service tests, a health-route test, a GitHub Actions workflow, and `info` logging. |
 | 11 | Security | Token remained recoverable from git history | History rewritten with `git filter-repo` and force-pushed; the commit contents are otherwise unchanged. |
 | 12 | Security | tgbotapi error messages contain the request URL, so runtime logs exposed the token | `logback.xml` redacts `bot<id>:<secret>` from messages and stack traces; a test guards the behavior. |
+| 15 | Security | tgbotapi logs through kslog, whose JVM backend uses `java.util.logging` directly, bypassing the Logback pattern; the token still appeared in plaintext in Render logs | `installJulToSlf4jBridge()` installs `SLF4JBridgeHandler` at startup so JUL records go through Logback and the redaction pattern. Guarded by `JulBridgeTest`. |
 | 13 | Availability | The free Render service sleeps after 15 minutes without traffic, stopping long polling | `keepalive.yml` pings `/healthz` every 5 minutes; documented in `DEPLOYMENT.md`. The job allows 10 minutes and the curl retries allow 8m45s, so a cold start is not cancelled mid-wake-up. |
 | 14 | UX / Architecture | User-facing prose lived in the game services, move labels were enum names, `TelegramBot` mixed wiring/parsing/flow, and an abandoned game locked the chat forever | Services return typed `RoundResult`; `Messages.kt` renders all text; moves have `displayName`; `GameFlow` + `MoveParser` split the adapter; games time out after two minutes. |
 
@@ -31,16 +32,25 @@ that was ever committed must be treated as compromised. Forks, existing clones, 
 caches may retain it.
 
 The current token was also pasted into chat and appeared in Render runtime logs:
-tgbotapi includes the request URL (with the token) in error messages. The application
-now redacts `bot<id>:<secret>` in `logback.xml`, but the token that was already logged
-must be rotated. Treat the current value as compromised.
+tgbotapi includes the request URL (with the token) in error messages. Two layers are
+needed to redact it:
+
+- `logback.xml` redacts `bot<id>:<secret>` from messages and stack traces.
+- `installJulToSlf4jBridge()` routes tgbotapi's `java.util.logging` records through
+  Logback. Without it, those records bypass the pattern and the token leaks.
+
+The token that was already logged must be rotated, and so must any token written to
+the logs before a build with the bridge was deployed. Treat the current value as
+compromised.
 
 1. Revoke the token in [@BotFather](https://t.me/BotFather) and issue a new one.
 2. Store it as the GitHub secret: `gh secret set BOT_TOKEN`.
 3. Run `gh workflow run deploy-render.yml` to update the Render environment variable
    and redeploy.
 4. Verify `/healthz` and send `/start` to the bot.
-5. Check Render logs for `bot<redacted>` and no token value.
+5. Wait for a new `HttpRequestTimeoutException` line, then check that Render logs show
+   `bot<redacted>` and no token value. Old log lines keep the value until retention
+   expires, so rotate after the bridge is deployed.
 
 See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the full setup (Render API key and service
 ID) and the rotation runbook. History is already purged; do not rewrite it again
@@ -57,8 +67,8 @@ without explicit approval and coordination with everyone who has a clone.
 - **Idle long-poll timeouts.** tgbotapi 37 sets the HTTP request timeout equal to
   Telegram's long-poll timeout, so an idle bot logs
   `HttpRequestTimeoutException` roughly every 30 seconds. The polling loop retries
-  and updates are not lost. The log redaction pattern keeps the token out of those
-  messages.
+  and updates are not lost. The jul-to-slf4j bridge routes these records through the
+  Logback redaction pattern so the token stays out of the logs.
 - **Render free-plan sleep.** The service stops after 15 minutes without inbound
   traffic. `.github/workflows/keepalive.yml` pings `/healthz` every 5 minutes, but
   GitHub can delay scheduled runs. Updates remain queued in Telegram for 24 hours.

@@ -14,7 +14,7 @@ working in this repository. Read this before changing code.
   for Telegram, Logback 1.6.6 for logging.
 - **Build:** Gradle 9.8.2 via the committed wrapper (`./gradlew`), with dependency
   versions in `gradle/libs.versions.toml`.
-- **Size:** 20 Kotlin source files, 7 test files, GitHub Actions CI, no persistence.
+- **Size:** 21 Kotlin source files, 8 test files, GitHub Actions CI, no persistence.
 - **Deployment:** single Docker image on **Render** (Docker web service, health check
   `/healthz`). The bot uses Telegram **long polling**, so no webhook is required.
   `.github/workflows/deploy-render.yml` pushes `secrets.BOT_TOKEN` to Render and
@@ -42,7 +42,10 @@ Rules for agents:
 3. tgbotapi includes the Telegram request URL (and therefore the token) in error
    messages. `src/main/resources/logback.xml` redacts `bot<id>:<secret>` from every
    message and stack trace; do not remove that pattern, and add a test with a fake
-   token if you change it.
+   token if you change it. tgbotapi logs through kslog, which uses
+   `java.util.logging` directly on the JVM; `installJulToSlf4jBridge()` in
+   `Application.kt` routes those records through Logback. Do not remove it — without
+   the bridge, JUL records bypass the redaction pattern and the token is logged.
 4. The old token was purged from git history with `git filter-repo`, but a token
    that was ever committed must still be treated as compromised and rotated via
    [@BotFather](https://t.me/BotFather). Do **not** rewrite history again unless the
@@ -91,6 +94,7 @@ Application.kt                        main(): reads config, starts Ktor
   │                                   (GET /healthz), then runBlocking { runTelegramBot }
   ├─ config/AppConfig.kt              BOT_TOKEN / PORT from the environment
   ├─ infrastructure/http/             GET /healthz route
+  ├─ infrastructure/logging/          JulBridge.kt: JUL -> SLF4J so redaction applies
   └─ infrastructure/telegram/         TelegramBot.kt: command wiring + long polling
        ├─ GameFlow.kt                 prompt, 2-minute timeout, chat lock
        ├─ MoveParser.kt               text -> move (case-insensitive)
@@ -124,7 +128,8 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/test/kotlin/com/el_giancar/application/*Test.kt` | Exhaustive pair tables for both games and typed results. |
 | `src/test/kotlin/com/el_giancar/config/AppConfigTest.kt` | Environment parsing and fail-fast behavior. |
 | `src/test/kotlin/com/el_giancar/infrastructure/http/HealthRouteTest.kt` | Ktor test for `GET /healthz`. |
-| `src/test/kotlin/com/el_giancar/infrastructure/logging/LogbackConfigTest.kt` | Verifies that bot tokens are redacted from logs. |
+| `src/test/kotlin/com/el_giancar/infrastructure/logging/LogbackConfigTest.kt` | Verifies that bot tokens are redacted from messages and stack traces. |
+| `src/test/kotlin/com/el_giancar/infrastructure/logging/JulBridgeTest.kt` | Verifies that `java.util.logging` records reach Logback and are redacted. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/MoveParserTest.kt` | Case-insensitive parsing and per-game move validation. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/MessagesTest.kt` | Exact win/tie wording, both moves, and prompt contents. |
 | `src/main/resources/logback.xml` | Console logging at `info`, with bot-token redaction. |
@@ -217,7 +222,8 @@ derived by looking up the pair in the opposite order.
 - tgbotapi 37 sets the HTTP request timeout equal to Telegram's long-poll timeout,
   so an idle bot logs an `HttpRequestTimeoutException` roughly every 30 seconds. The
   polling loop recovers on the next request and updates are not lost. Do not remove
-  the log redaction pattern because that exception message contains the token.
+  the log redaction pattern or the jul-to-slf4j bridge because that exception message
+  contains the token.
 - Render's free plan sleeps after 15 minutes without inbound traffic. The scheduled
   `keepalive.yml` workflow pings `/healthz`; keep it enabled while on the free plan.
 - `getNames<T>()` was removed together with string-based parsing. Do not reintroduce

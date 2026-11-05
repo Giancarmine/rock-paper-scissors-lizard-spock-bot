@@ -22,6 +22,7 @@ dependencies {
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
     implementation(libs.logback.classic)
+    implementation(libs.slf4j.jul)
     implementation(libs.tgbotapi)
 
     testImplementation(libs.ktor.server.test.host)
