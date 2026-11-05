@@ -7,8 +7,9 @@ Key points:
 
 - Kotlin/JVM + Ktor + tgbotapi Telegram bot. Entry point:
   `src/main/kotlin/com/el_giancar/Application.kt`; bot wiring:
-  `src/main/kotlin/com/el_giancar/plugins/Telegram.kt`; game rules:
-  `src/main/kotlin/com/el_giancar/srv/`.
+  `src/main/kotlin/com/el_giancar/infrastructure/telegram/`; game rules:
+  `src/main/kotlin/com/el_giancar/application/`; move enums:
+  `src/main/kotlin/com/el_giancar/domain/`.
 - The token is read from the `BOT_TOKEN` environment variable. **Never** print, copy,
   or commit a real token. The old token was purged from git history but must still be
   rotated with @BotFather.

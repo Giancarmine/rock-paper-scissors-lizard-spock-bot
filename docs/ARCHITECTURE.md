@@ -23,11 +23,15 @@ provides `PORT`, default 8080) and serves only `GET /healthz`.
 
 | Component | File | Responsibility |
 | --- | --- | --- |
-| Entry point | `src/main/kotlin/com/el_giancar/Application.kt` | Reads `BOT_TOKEN` and `PORT`, starts `embeddedServer(Netty)`, installs `/healthz`, then runs the Telegram loop on the main thread. |
-| Telegram plugin | `src/main/kotlin/com/el_giancar/plugins/Telegram.kt` | Reads `BOT_TOKEN`, creates the bot, registers commands, builds keyboards, parses input, serializes games per chat, runs long polling. |
-| Move enums | `src/main/kotlin/com/el_giancar/model/ClassicMoveType.kt`, `SheldonMoveType.kt` | Allowed moves. |
-| Game services | `src/main/kotlin/com/el_giancar/srv/ClassicGameService.kt`, `SheldonGameService.kt` | Choose a random computer move, resolve the round, return a message. Stateless and Telegram-free. |
-| Tests | `src/test/kotlin/com/el_giancar/srv/*Test.kt` | Exhaustive pair tables and canonical phrase checks. |
+| Entry point | `src/main/kotlin/com/el_giancar/Application.kt` | Composition root: reads `AppConfig`, starts `embeddedServer(Netty)`, installs `/healthz`, wires services, then runs the Telegram loop on the main thread. |
+| Config | `src/main/kotlin/com/el_giancar/config/AppConfig.kt` | Reads `BOT_TOKEN` and `PORT`; fails fast when the token is missing. |
+| Telegram adapter | `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Creates the bot, registers commands, runs long polling, parses input, and delegates games to the application services. |
+| Keyboards / messages | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Keyboards.kt`, `Messages.kt` | Reply keyboards and user-facing text. |
+| HTTP adapter | `src/main/kotlin/com/el_giancar/infrastructure/http/HealthRoutes.kt` | `GET /healthz` route. |
+| Move enums | `src/main/kotlin/com/el_giancar/domain/ClassicMoveType.kt`, `SheldonMoveType.kt` | Allowed moves. |
+| Game services | `src/main/kotlin/com/el_giancar/application/ClassicGameService.kt`, `SheldonGameService.kt` | Choose a random computer move, resolve the round, return a message. Stateless and Telegram-free. |
+| Chat locks | `src/main/kotlin/com/el_giancar/application/ChatLocks.kt` | One `Mutex` per numeric chat id, keeping the application layer Telegram-free. |
+| Tests | `src/test/kotlin/com/el_giancar/{application,config}/*Test.kt`, `infrastructure/http/HealthRouteTest.kt` | Exhaustive pair tables, canonical phrase checks, environment parsing, and the health route. |
 | Logging | `src/main/resources/logback.xml` | Console appender; root level `info`. |
 | API spec | `src/main/resources/openapi/documentation.yaml` | Description of `/healthz`; not referenced by code. |
 | CI | `.github/workflows/ci.yml` | Builds and tests on push/PR. |
@@ -40,14 +44,14 @@ sequenceDiagram
     participant Main as main()
     participant Env as Environment
     participant Ktor as Ktor/Netty
-    participant TG as configureTelegram()
+    participant TG as runTelegramBot()
     participant API as Telegram Bot API
 
-    Main->>Env: read BOT_TOKEN (fail fast if missing) and PORT
+    Main->>Env: AppConfig.fromEnvironment() (fail fast if BOT_TOKEN is missing)
     Main->>Ktor: embeddedServer(..., port)
     Main->>Ktor: start(wait = false)
     Ktor->>Ktor: routing { GET /healthz }
-    Main->>TG: runBlocking { configureTelegram(token) }
+    Main->>TG: runBlocking { runTelegramBot(token, services, locks) }
     TG->>API: telegramBot(token), getMe()
     TG->>API: buildBehaviourWithLongPolling (getUpdates loop)
     Note over TG,API: join() keeps the coroutine alive
@@ -168,7 +172,7 @@ Notes:
   is never a build argument and is never baked into the image.
 - CI (`.github/workflows/ci.yml`) builds and tests every push/PR. The deploy workflow
   (`.github/workflows/deploy-render.yml`) runs on `v*` tags or manual dispatch.
-- Build and runtime both use JDK 17. Render supplies `PORT` and probes `/healthz`.
+- Build and runtime both use JDK 21. Render supplies `PORT` and probes `/healthz`.
 - The bot only needs a long-running process and outbound HTTPS to `api.telegram.org`;
   this architecture works on any comparable PaaS.
 
@@ -176,8 +180,8 @@ Notes:
 
 - **Ktor with a single health route.** Keeps the process alive, satisfies PaaS port
   and health checks, and leaves the Telegram path independent of HTTP.
-- **Services separated from Telegram.** `srv` has no tgbotapi dependency, which makes
-  the rules unit-testable.
+- **Services separated from Telegram.** `application` has no tgbotapi dependency, which
+  makes the rules unit-testable.
 - **Typed service API.** Enums instead of strings remove an entire class of parsing
   bugs (case, unknown moves, wrong enum set).
 - **Prose in services.** Win/lose strings are returned directly by the services
@@ -191,8 +195,8 @@ Notes:
 
 | Goal | Where to change |
 | --- | --- |
-| New command | `plugins/Telegram.kt` (`onCommand`) + `printCommandsMenu` + `helpMessage` |
-| New move | relevant `model/*MoveType.kt`, service `winningPhrases`, keyboard, `/rules`, tests, docs |
+| New command | `infrastructure/telegram/TelegramBot.kt` (`onCommand`) + `Keyboards.kt` + `Messages.kt` |
+| New move | relevant `domain/*MoveType.kt`, service `winningPhrases`, keyboard, `/rules`, tests, docs |
 | Game timeout | wrap `awaitMove(...)` in `withTimeoutOrNull` and always release the mutex in `finally` |
 | Better randomness / tests | pass a seeded `Random` to the service constructor, or keep using the deterministic overload |
 | Scores / persistence | Introduce a repository keyed by `chat.id`/`user.id`; keep it out of the stateless services |

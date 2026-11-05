@@ -1,4 +1,4 @@
-package com.el_giancar.model
+package com.el_giancar.domain
 
 enum class ClassicMoveType {
     PAPER,

@@ -1,9 +1,9 @@
-FROM gradle:7.5-jdk17 AS build
+FROM gradle:9.8.2-jdk21 AS build
 WORKDIR /home/gradle/src
 COPY --chown=gradle:gradle . .
 RUN ./gradlew buildFatJar --no-daemon
 
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /home/gradle/src/build/libs/*-all.jar /app/app.jar
 ENV PORT=8080

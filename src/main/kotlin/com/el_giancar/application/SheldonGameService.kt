@@ -1,6 +1,6 @@
-package com.el_giancar.srv
+package com.el_giancar.application
 
-import com.el_giancar.model.SheldonMoveType
+import com.el_giancar.domain.SheldonMoveType
 import java.util.Random
 
 class SheldonGameService(private val random: Random = Random()) {
@@ -27,7 +27,7 @@ class SheldonGameService(private val random: Random = Random()) {
     }
 
     private fun randomMove(): SheldonMoveType {
-        val moves = SheldonMoveType.values()
+        val moves = SheldonMoveType.entries
         return moves[random.nextInt(moves.size)]
     }
 
