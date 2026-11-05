@@ -1,7 +1,12 @@
 <configuration>
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <!--
+                Redact Telegram bot tokens from log messages and stack traces.
+                tgbotapi logs the request URL on failures, for example:
+                https://api.telegram.org/bot<id>:<secret>/getUpdates
+            -->
+            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %replace(%msg%n%ex){'bot[0-9]+:[A-Za-z0-9_-]+', 'bot&lt;redacted&gt;'}%n</pattern>
         </encoder>
     </appender>
     <root level="info">

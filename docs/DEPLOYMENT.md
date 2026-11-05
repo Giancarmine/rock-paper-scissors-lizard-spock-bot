@@ -72,6 +72,24 @@ gh run list --workflow=deploy-render.yml
 gh run watch
 ```
 
+## Staying on the free plan
+
+The service runs on Render's **free** plan. Free web services stop after 15 minutes
+without inbound traffic; outbound long polling alone does not keep them awake. The
+[`Keep alive`](../.github/workflows/keepalive.yml) workflow requests `/healthz` every
+5 minutes so the service stays up and keeps processing Telegram updates.
+
+- One always-on free service stays within Render's monthly instance-hour allowance
+  (750 hours; a 31-day month is 744 hours). The allowance is shared across the
+  workspace, so budget for any other free services.
+- GitHub scheduled workflows can be delayed, especially at high load. If the service
+  does sleep, the next ping wakes it; Telegram retains updates for 24 hours, so
+  messages are delivered late rather than lost.
+- Update `HEALTHCHECK_URL` in the workflow if the service URL changes. Remove the
+  workflow after moving to a paid plan that does not sleep.
+- Scheduled workflows are disabled after 60 days without repository activity; a
+  regular commit or manual run re-enables them.
+
 ## Token rotation runbook
 
 Use this after a leak or a scheduled rotation:
@@ -85,9 +103,15 @@ Use this after a leak or a scheduled rotation:
    ```bash
    gh workflow run deploy-render.yml
    ```
-4. Confirm the run succeeds and the Render deploy reaches **Live**.
+4. Confirm the run succeeds and the Render deploy reaches **Live**:
+   ```bash
+   render deploys list srv-xxxxxxxxxxxxxxxx -o text
+   ```
 5. Send `/start` to the bot to verify it responds.
 6. Check `https://<your-service>.onrender.com/healthz` returns `OK`.
+7. Confirm Render logs no longer contain the old token. tgbotapi includes the
+   request URL (and therefore the token) in its error messages, so
+   `src/main/resources/logback.xml` redacts `bot<id>:<secret>` before writing logs.
 
 No code change or commit is needed for a rotation.
 
@@ -98,6 +122,10 @@ No code change or commit is needed for a rotation.
 - The workflow never echoes the token. The `PUT` body is passed through stdin to
   `curl` to keep it out of process arguments where practical.
 - GitHub masks secret values in logs, but avoid printing them anyway.
+- Runtime logs are written by the app, not by GitHub. tgbotapi includes the Telegram
+  request URL (which contains the token) in error messages, so
+  `logback.xml` applies a redaction pattern to every message and stack trace. Do not
+  remove that pattern. If a token still appears in Render logs, rotate it immediately.
 - A token that was ever committed is compromised even after history is rewritten:
   rotate it, and remember that forks/clones/caches may retain the old value.
 - Render environment groups are not updated by this workflow; it only updates
@@ -113,4 +141,6 @@ No code change or commit is needed for a rotation.
 | Workflow fails with HTTP 403 | API key lacks the required scopes. |
 | Deploy stays queued or fails | Check the Render deploy logs; the service may need a plan/region change. |
 | Bot starts but does not answer | The token is invalid/revoked, or the service cannot reach `api.telegram.org`. |
+| Bot does not answer after a quiet period | The free service slept; check the `Keep alive` workflow and wake it with `curl https://<your-service>.onrender.com/healthz`. |
+| Render logs show `HttpRequestTimeoutException` every 30 seconds | tgbotapi's client timeout equals the long-poll timeout while idle. The token is redacted; the bot keeps polling. |
 | `/healthz` returns 404 | The deployed revision predates the health route; redeploy. |

@@ -18,7 +18,9 @@ working in this repository. Read this before changing code.
 - **Deployment:** single Docker image on **Render** (Docker web service, health check
   `/healthz`). The bot uses Telegram **long polling**, so no webhook is required.
   `.github/workflows/deploy-render.yml` pushes `secrets.BOT_TOKEN` to Render and
-  triggers a deploy.
+  triggers a deploy. The service stays on the free plan,
+  and `.github/workflows/keepalive.yml` pings `/healthz` every 5 minutes so Render
+  does not sleep and stop polling.
 
 Repository root is the directory containing this file.
 
@@ -37,13 +39,17 @@ Rules for agents:
 1. **Never** print, copy, log, echo, or commit real secrets. Use `BOT_TOKEN` /
    `<your-token>` placeholders in docs, tests, fixtures, and commit messages.
 2. `.env` is git-ignored; `.env.example` documents the variable names.
-3. The old token was purged from git history with `git filter-repo`, but a token
+3. tgbotapi includes the Telegram request URL (and therefore the token) in error
+   messages. `src/main/resources/logback.xml` redacts `bot<id>:<secret>` from every
+   message and stack trace; do not remove that pattern, and add a test with a fake
+   token if you change it.
+4. The old token was purged from git history with `git filter-repo`, but a token
    that was ever committed must still be treated as compromised and rotated via
    [@BotFather](https://t.me/BotFather). Do **not** rewrite history again unless the
    owner explicitly asks.
-4. Do not add tokens to `Dockerfile`, `build.gradle.kts`, source files, or workflow
+5. Do not add tokens to `Dockerfile`, `build.gradle.kts`, source files, or workflow
    files.
-5. Production tokens live in GitHub Actions secrets: `BOT_TOKEN`,
+6. Production tokens live in GitHub Actions secrets: `BOT_TOKEN`,
    `RENDER_API_KEY`, plus the `RENDER_SERVICE_ID` repository variable. The deploy
    workflow copies `BOT_TOKEN` to Render at deploy time.
 
@@ -107,11 +113,13 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/test/kotlin/com/el_giancar/application/*Test.kt` | Exhaustive pair tables for both games. |
 | `src/test/kotlin/com/el_giancar/config/AppConfigTest.kt` | Environment parsing and fail-fast behavior. |
 | `src/test/kotlin/com/el_giancar/infrastructure/http/HealthRouteTest.kt` | Ktor test for `GET /healthz`. |
-| `src/main/resources/logback.xml` | Console logging at `info`. |
+| `src/test/kotlin/com/el_giancar/infrastructure/logging/LogbackConfigTest.kt` | Verifies that bot tokens are redacted from logs. |
+| `src/main/resources/logback.xml` | Console logging at `info`, with bot-token redaction. |
 | `src/main/resources/openapi/documentation.yaml` | Documents the `/healthz` endpoint (not served by Ktor). |
 | `Dockerfile`, `.dockerignore` | Two-stage JDK 21 build, fat jar runtime. |
 | `.github/workflows/ci.yml` | CI: `./gradlew build buildFatJar` on Temurin 21. |
 | `.github/workflows/deploy-render.yml` | Updates `BOT_TOKEN` on Render and triggers a deploy. |
+| `.github/workflows/keepalive.yml` | Pings `/healthz` every 5 minutes so the free Render service stays awake. |
 | `docs/DEPLOYMENT.md` | Render setup, secrets, and token-rotation runbook. |
 | `build.gradle.kts`, `gradle/libs.versions.toml` | Build logic and dependency versions. |
 
@@ -184,6 +192,12 @@ the map once — losses are derived from the same map.
 - `ChatIdentifier`/`ChatId` is a value class; the mutex map is keyed by the underlying
   `Long` (`message.chat.id.chatId.long`).
 - The OpenAPI YAML is documentation only; no Ktor route serves it.
+- tgbotapi 37 sets the HTTP request timeout equal to Telegram's long-poll timeout,
+  so an idle bot logs an `HttpRequestTimeoutException` roughly every 30 seconds. The
+  polling loop recovers on the next request and updates are not lost. Do not remove
+  the log redaction pattern because that exception message contains the token.
+- Render's free plan sleeps after 15 minutes without inbound traffic. The scheduled
+  `keepalive.yml` workflow pings `/healthz`; keep it enabled while on the free plan.
 - `getNames<T>()` was removed together with string-based parsing. Do not reintroduce
   it unless it has a real caller.
 - The old bot token was removed from all commits, but copies/forks/caches may still
@@ -229,7 +243,9 @@ token.
 2. Store it as the GitHub secret: `gh secret set BOT_TOKEN`.
 3. Run the deploy workflow: `gh workflow run deploy-render.yml`. It updates the
    Render environment variable and redeploys.
-4. Verify `/healthz` and send `/start` to the bot.
+4. Confirm the deploy is live (`render deploys list <srv-id>`) and `/healthz` returns
+   `OK`, then send `/start` to the bot.
+5. Confirm Render logs show `bot<redacted>` and not the token.
 
 See `docs/DEPLOYMENT.md`. History was already purged; do not rewrite it again without
 explicit owner approval and coordination with all clones.
