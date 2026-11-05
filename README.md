@@ -59,18 +59,19 @@ Spock vaporizes Rock
 
 ## Tech stack
 
-- Kotlin/JVM 1.7.22
-- Ktor 2.2.3 (Netty)
-- tgbotapi 5.1.0 (`dev.inmo`)
-- Gradle 7.5.1 (wrapper committed)
-- Logback
-- Docker (multi-stage, JDK 17)
+- Kotlin/JVM 2.4.21
+- Ktor 3.6.1 (Netty)
+- tgbotapi 37.1.0 (`dev.inmo`)
+- Gradle 9.8.2 (wrapper committed)
+- Logback 1.6.6
+- JUnit 5 (Jupiter)
+- Docker (multi-stage, JDK 21)
 
 ## Getting started
 
 ### Prerequisites
 
-- JDK 17 (used for both the Docker build and runtime)
+- JDK 21 (used for both the Docker build and runtime)
 - A Telegram bot token from [@BotFather](https://t.me/BotFather)
 
 ### Configure
@@ -111,8 +112,9 @@ docker build -t rpsls-bot .
 docker run --rm -p 8080:8080 -e BOT_TOKEN="<your-token>" rpsls-bot
 ```
 
-The image is multi-stage: Gradle + JDK 17 to build the fat jar, then a Temurin 17
-JRE runtime. The token is injected at runtime and is not baked into the image.
+The image is multi-stage: Gradle 9.8.2 + JDK 21 to build the fat jar, then a
+Temurin 21 JRE runtime. The token is injected at runtime and is not baked into the
+image.
 
 ### Tests
 
@@ -121,7 +123,7 @@ JRE runtime. The token is injected at runtime and is not baked into the image.
 ```
 
 `src/test/kotlin` contains exhaustive pair tables for both game modes plus checks for
-the canonical winning phrases.
+the canonical winning phrases. Tests run on JUnit 5 via `kotlin-test-junit5`.
 
 ### Health check
 
@@ -133,21 +135,30 @@ curl http://localhost:8080/healthz   # OK
 
 ```text
 src/main/kotlin/com/el_giancar/
-├── Application.kt              # entry point: BOT_TOKEN/PORT, /healthz, bot startup
-├── model/
-│   ├── ClassicMoveType.kt      # 3-move enum
-│   └── SheldonMoveType.kt      # 5-move enum
-├── plugins/
-│   └── Telegram.kt             # token, commands, keyboards, input handling
-└── srv/
-    ├── ClassicGameService.kt   # classic game logic
-    └── SheldonGameService.kt   # 5-move game logic
+├── Application.kt                     # composition root: config, Ktor, bot
+├── config/
+│   └── AppConfig.kt                   # BOT_TOKEN / PORT from the environment
+├── domain/
+│   ├── ClassicMoveType.kt             # 3-move enum
+│   └── SheldonMoveType.kt             # 5-move enum
+├── application/
+│   ├── ClassicGameService.kt          # classic game logic
+│   ├── SheldonGameService.kt          # 5-move game logic
+│   └── ChatLocks.kt                   # one mutex per chat
+└── infrastructure/
+    ├── http/
+    │   └── HealthRoutes.kt            # GET /healthz
+    └── telegram/
+        ├── TelegramBot.kt             # bot wiring, commands, game flow
+        ├── Keyboards.kt               # reply keyboards
+        └── Messages.kt                # user-facing text
 src/main/resources/
 ├── logback.xml
-└── openapi/documentation.yaml  # documents /healthz
-src/test/kotlin/com/el_giancar/srv/
-├── ClassicGameServiceTest.kt
-└── SheldonGameServiceTest.kt
+└── openapi/documentation.yaml         # documents /healthz
+src/test/kotlin/com/el_giancar/
+├── application/                       # game-rule tests
+├── config/                            # environment config tests
+└── infrastructure/http/               # /healthz route test
 ```
 
 ## Known limitations

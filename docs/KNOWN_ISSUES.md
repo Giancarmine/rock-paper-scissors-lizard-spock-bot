@@ -7,12 +7,12 @@ both a changelog of the review and a list of what still needs owner action.
 
 | # | Area | Finding | Resolution |
 | --- | --- | --- | --- |
-| 1 | Security | Bot token hardcoded in `plugins/Telegram.kt` | Token is read from `BOT_TOKEN`; the app fails fast if unset. The source no longer contains a token. |
+| 1 | Security | Bot token hardcoded in the Telegram layer | Token is read from `BOT_TOKEN`; the app fails fast if unset. The source no longer contains a token. |
 | 2 | Robustness | Invalid/lowercase input caused `NullPointerException` via `playerMove!!` | Input is trimmed, matched case-insensitively, retried up to 3 times, then cancelled cleanly. No `!!`. |
 | 3 | Correctness | `/classic_game` validated against `SheldonMoveType`, accepting LIZARD/SPOCK | Services now take enum values; the classic handler parses against `ClassicMoveType` only. |
 | 4 | UX | `/help` and `/about` buttons were not implemented | Both commands are registered with real content and listed in help. |
 | 5 | Concurrency | Games could race or consume each other's replies | Per-chat `Mutex` serializes games; `waitTextMessage` is filtered to the originating chat. |
-| 6 | Packaging | `EXPOSE 8080:8080`, JDK 17 build vs JDK 11 runtime, unused `ARG TOKEN`, hardcoded jar name, `gradle build` vs fat jar | Multi-stage JDK 17 build with `buildFatJar`, Temurin 17 runtime, `EXPOSE 8080`, runtime `BOT_TOKEN`, stable `/app/app.jar`. |
+| 6 | Packaging | `EXPOSE 8080:8080`, build/runtime JDK mismatch, unused `ARG TOKEN`, hardcoded jar name, `gradle build` vs fat jar | Multi-stage JDK build with `buildFatJar`, matching runtime, `EXPOSE 8080`, runtime `BOT_TOKEN`, stable `/app/app.jar`. Current images use JDK 21. |
 | 7 | Dependencies | Unused/out-of-sync `ktor-client-okhttp:2.0.1` | Removed. |
 | 8 | Correctness | Unreachable `else` branches re-rolled the RNG | Replaced by a single `error(...)` path in rule lookup. |
 | 9 | API surface | OpenAPI spec described non-existent routes; no health endpoint | Added `GET /healthz`; the spec now documents only that endpoint. |
@@ -63,7 +63,7 @@ without explicit approval and coordination with everyone who has a clone.
   `git filter-repo` rewrite; the rewritten HEAD tree matches the pre-rewrite tree.
 - Unit tests added for all 9 classic pairs and all 25 Sheldon pairs, plus canonical
   phrase checks, and a `testApplication` check for `GET /healthz`.
-- `./gradlew clean test buildFatJar` passes with Temurin JDK 17; the fat jar starts
+- `./gradlew clean test buildFatJar` passes with Temurin JDK 21; the fat jar starts
   and fails fast with a clear message when `BOT_TOKEN` is missing.
 - The `/healthz` route was smoke-tested against a running fat jar.
 - Runtime smoke test of the Telegram path requires a valid token and was not

@@ -1,4 +1,4 @@
-package com.el_giancar
+package com.el_giancar.infrastructure.http
 
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -11,7 +11,7 @@ class HealthRouteTest {
     @Test
     fun `healthz responds with OK`() = testApplication {
         application {
-            configureHttp()
+            healthRoutes()
         }
 
         val response = client.get("/healthz")

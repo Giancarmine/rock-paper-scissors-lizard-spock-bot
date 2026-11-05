@@ -1,6 +1,6 @@
-package com.el_giancar.srv
+package com.el_giancar.application
 
-import com.el_giancar.model.ClassicMoveType
+import com.el_giancar.domain.ClassicMoveType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -16,8 +16,8 @@ class ClassicGameServiceTest {
             ClassicMoveType.SCISSORS to setOf(ClassicMoveType.PAPER)
         )
 
-        for (player in ClassicMoveType.values()) {
-            for (computer in ClassicMoveType.values()) {
+        for (player in ClassicMoveType.entries) {
+            for (computer in ClassicMoveType.entries) {
                 val result = service.play(player, computer)
                 when {
                     player == computer -> assertEquals("It's a tie!", result)

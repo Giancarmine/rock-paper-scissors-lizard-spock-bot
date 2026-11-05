@@ -1,6 +1,6 @@
-package com.el_giancar.srv
+package com.el_giancar.application
 
-import com.el_giancar.model.ClassicMoveType
+import com.el_giancar.domain.ClassicMoveType
 import java.util.Random
 
 class ClassicGameService(private val random: Random = Random()) {
@@ -27,7 +27,7 @@ class ClassicGameService(private val random: Random = Random()) {
     }
 
     private fun randomMove(): ClassicMoveType {
-        val moves = ClassicMoveType.values()
+        val moves = ClassicMoveType.entries
         return moves[random.nextInt(moves.size)]
     }
 

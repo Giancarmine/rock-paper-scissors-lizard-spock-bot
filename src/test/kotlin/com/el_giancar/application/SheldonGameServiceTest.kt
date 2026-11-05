@@ -1,6 +1,6 @@
-package com.el_giancar.srv
+package com.el_giancar.application
 
-import com.el_giancar.model.SheldonMoveType
+import com.el_giancar.domain.SheldonMoveType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -18,8 +18,8 @@ class SheldonGameServiceTest {
             SheldonMoveType.SPOCK to setOf(SheldonMoveType.ROCK, SheldonMoveType.SCISSORS)
         )
 
-        for (player in SheldonMoveType.values()) {
-            for (computer in SheldonMoveType.values()) {
+        for (player in SheldonMoveType.entries) {
+            for (computer in SheldonMoveType.entries) {
                 val result = service.play(player, computer)
                 when {
                     player == computer -> assertEquals("It's a tie!", result)
