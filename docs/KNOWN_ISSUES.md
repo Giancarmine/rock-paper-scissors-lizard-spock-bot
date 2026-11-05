@@ -20,6 +20,7 @@ is both a changelog of the review and a list of what still needs owner action.
 | 11 | Security | Token remained recoverable from git history | History rewritten with `git filter-repo` and force-pushed; the commit contents are otherwise unchanged. |
 | 12 | Security | tgbotapi error messages contain the request URL, so runtime logs exposed the token | `logback.xml` redacts `bot<id>:<secret>` from messages and stack traces; a test guards the behavior. |
 | 13 | Availability | The free Render service sleeps after 15 minutes without traffic, stopping long polling | `keepalive.yml` pings `/healthz` every 5 minutes; documented in `DEPLOYMENT.md`. |
+| 14 | UX / Architecture | User-facing prose lived in the game services, move labels were enum names, `TelegramBot` mixed wiring/parsing/flow, and an abandoned game locked the chat forever | Services return typed `RoundResult`; `Messages.kt` renders all text; moves have `displayName`; `GameFlow` + `MoveParser` split the adapter; games time out after two minutes. |
 
 ## Still requires owner action
 
@@ -47,9 +48,6 @@ without explicit approval and coordination with everyone who has a clone.
 
 ## Remaining limitations (accepted for now)
 
-- **No game timeout.** A pending game holds the chat's mutex until the user replies
-  or sends a command. A timeout can be added with `withTimeoutOrNull` around
-  `awaitMove`; release the lock in `finally`.
 - **No persistence or scores.** Every round is independent.
 - **No license.** Treat as all rights reserved unless the owner adds one.
 - **OpenAPI file is not served.** It is documentation only; if consumers need it
@@ -77,8 +75,9 @@ without explicit approval and coordination with everyone who has a clone.
 - Source review of all Kotlin files, Gradle files, Dockerfile, and resources.
 - `grep` for the old token: absent from tracked files and from every commit after the
   `git filter-repo` rewrite; the rewritten HEAD tree matches the pre-rewrite tree.
-- Unit tests added for all 9 classic pairs and all 25 Sheldon pairs, plus canonical
-  phrase checks, and a `testApplication` check for `GET /healthz`.
+- Unit tests added for all 9 classic pairs and all 25 Sheldon pairs, typed outcomes,
+  canonical phrase checks, exact message formatting, move parsing, and a
+  `testApplication` check for `GET /healthz`.
 - `./gradlew clean test buildFatJar` passes with Temurin JDK 21; the fat jar starts
   and fails fast with a clear message when `BOT_TOKEN` is missing.
 - The `/healthz` route was smoke-tested against a running fat jar.

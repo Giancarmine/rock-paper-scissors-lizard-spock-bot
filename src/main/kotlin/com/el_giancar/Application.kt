@@ -25,8 +25,8 @@ fun main() {
         runBlocking {
             runTelegramBot(
                 token = config.botToken,
-                classicGameService = ClassicGameService(),
-                sheldonGameService = SheldonGameService(),
+                classicGame = ClassicGameService(),
+                sheldonGame = SheldonGameService(),
                 chatLocks = ChatLocks(),
             )
         }

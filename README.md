@@ -11,10 +11,11 @@ Docker image.
 ## Features
 
 - Two game modes: classic (3 moves) and Sheldon (5 moves).
-- Reply keyboards for each mode.
-- `/rules` prints the full rules.
+- Reply keyboards with readable move labels (`Rock`, `Paper`, `Lizard`, ...).
+- Every result shows your move, the bot's move, and the winning relation.
+- `/rules` prints the full rules with a consistent, friendly tone.
 - Case-insensitive input with up to three attempts before the game is cancelled.
-- One game per chat at a time; other chats are unaffected.
+- One game per chat at a time, with a two-minute timeout so a chat cannot stay locked.
 - `/healthz` HTTP endpoint for hosting platforms.
 - No accounts, scores, or database — every round is independent.
 - Uses Telegram long polling, so no public URL or webhook is required.
@@ -122,8 +123,9 @@ image.
 ./gradlew test
 ```
 
-`src/test/kotlin` contains exhaustive pair tables for both game modes plus checks for
-the canonical winning phrases. Tests run on JUnit 5 via `kotlin-test-junit5`.
+`src/test/kotlin` contains exhaustive pair tables for both game modes, checks for the
+canonical winning phrases, formatting tests for the user-facing messages, and move
+parser tests. Tests run on JUnit 5 via `kotlin-test-junit5`.
 
 ### Health check
 
@@ -139,17 +141,26 @@ src/main/kotlin/com/el_giancar/
 ├── config/
 │   └── AppConfig.kt                   # BOT_TOKEN / PORT from the environment
 ├── domain/
+│   ├── Move.kt                        # move contract + display name
+│   ├── GameOutcome.kt                 # WIN / LOSE / TIE
+│   ├── RoundResult.kt                 # typed result of one round
 │   ├── ClassicMoveType.kt             # 3-move enum
 │   └── SheldonMoveType.kt             # 5-move enum
 ├── application/
-│   ├── ClassicGameService.kt          # classic game logic
-│   ├── SheldonGameService.kt          # 5-move game logic
+│   ├── Game.kt                        # playable game contract
+│   ├── GameRules.kt                   # legal moves + winning phrases
+│   ├── GameService.kt                 # shared round resolution
+│   ├── ClassicGameService.kt          # classic rules
+│   ├── SheldonGameService.kt          # 5-move rules
 │   └── ChatLocks.kt                   # one mutex per chat
 └── infrastructure/
     ├── http/
     │   └── HealthRoutes.kt            # GET /healthz
     └── telegram/
-        ├── TelegramBot.kt             # bot wiring, commands, game flow
+        ├── TelegramBot.kt             # command wiring
+        ├── GameFlow.kt                # prompt, timeout, lock, result
+        ├── MoveParser.kt              # text -> move
+        ├── Replies.kt                 # shared reply helpers
         ├── Keyboards.kt               # reply keyboards
         └── Messages.kt                # user-facing text
 src/main/resources/
@@ -159,14 +170,15 @@ src/test/kotlin/com/el_giancar/
 ├── application/                       # game-rule tests
 ├── config/                            # environment config tests
 ├── infrastructure/http/               # /healthz route test
-└── infrastructure/logging/            # log redaction test
+├── infrastructure/logging/            # log redaction test
+└── infrastructure/telegram/           # message + move parser tests
 ```
 
 ## Known limitations
 
 - No persistence, scores, or leaderboards.
-- No timeout for an abandoned game; the chat stays locked until the user answers or
-  sends a command.
+- A game that receives no move for two minutes is cancelled automatically; the reply
+  keyboard and the chat lock are released.
 - The OpenAPI document is descriptive only and is not served by the application.
 - On Render's free plan the service sleeps without traffic; the scheduled keep-alive
   workflow mitigates this, but scheduled runs can be delayed.

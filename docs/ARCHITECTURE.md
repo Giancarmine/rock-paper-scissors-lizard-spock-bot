@@ -10,8 +10,10 @@ flowchart LR
     User[Telegram user] <-->|messages, buttons| TG[Telegram Bot API]
     TG <-->|long polling over HTTPS| Bot[Bot process<br/>Ktor Netty :$PORT]
     Health[Platform health check] -->|GET /healthz| Bot
-    Bot --> Classic[ClassicGameService]
-    Bot --> Sheldon[SheldonGameService]
+    Bot --> Flow[GameFlow<br/>prompt, timeout, chat lock]
+    Flow --> Classic[ClassicGameService]
+    Flow --> Sheldon[SheldonGameService]
+    Flow --> Messages[Messages<br/>render RoundResult]
 ```
 
 The bot is an outbound-only client of the Telegram Bot API. It does not expose a
@@ -25,13 +27,17 @@ provides `PORT`, default 8080) and serves only `GET /healthz`.
 | --- | --- | --- |
 | Entry point | `src/main/kotlin/com/el_giancar/Application.kt` | Composition root: reads `AppConfig`, starts `embeddedServer(Netty)`, installs `/healthz`, wires services, then runs the Telegram loop on the main thread. |
 | Config | `src/main/kotlin/com/el_giancar/config/AppConfig.kt` | Reads `BOT_TOKEN` and `PORT`; fails fast when the token is missing. |
-| Telegram adapter | `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Creates the bot, registers commands, runs long polling, parses input, and delegates games to the application services. |
-| Keyboards / messages | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Keyboards.kt`, `Messages.kt` | Reply keyboards and user-facing text. |
+| Telegram adapter | `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Creates the bot, registers commands, and runs long polling. |
+| Game flow | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameFlow.kt` | Acquires the per-chat lock, prompts for a move, applies the two-minute timeout, and renders the result. |
+| Move parser | `src/main/kotlin/com/el_giancar/infrastructure/telegram/MoveParser.kt` | Maps trimmed, case-insensitive text to a legal move of the selected game. |
+| Keyboards / messages | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Keyboards.kt`, `Messages.kt`, `Replies.kt` | Reply keyboards, user-facing text, and shared reply helpers. |
 | HTTP adapter | `src/main/kotlin/com/el_giancar/infrastructure/http/HealthRoutes.kt` | `GET /healthz` route. |
-| Move enums | `src/main/kotlin/com/el_giancar/domain/ClassicMoveType.kt`, `SheldonMoveType.kt` | Allowed moves. |
-| Game services | `src/main/kotlin/com/el_giancar/application/ClassicGameService.kt`, `SheldonGameService.kt` | Choose a random computer move, resolve the round, return a message. Stateless and Telegram-free. |
+| Move domain | `src/main/kotlin/com/el_giancar/domain/Move.kt`, `ClassicMoveType.kt`, `SheldonMoveType.kt` | Legal moves, their display names, and the two variants. |
+| Round domain | `src/main/kotlin/com/el_giancar/domain/GameOutcome.kt`, `RoundResult.kt` | Typed outcome (`WIN`/`LOSE`/`TIE`) and the resolved round data. |
+| Game application | `src/main/kotlin/com/el_giancar/application/Game.kt`, `GameRules.kt`, `GameService.kt` | Variant contract, legal moves + winning phrases, and shared round resolution. Stateless and Telegram-free. |
+| Game variants | `src/main/kotlin/com/el_giancar/application/ClassicGameService.kt`, `SheldonGameService.kt` | The 3-move and 5-move rule sets; thin subclasses of `GameService`. |
 | Chat locks | `src/main/kotlin/com/el_giancar/application/ChatLocks.kt` | One `Mutex` per numeric chat id, keeping the application layer Telegram-free. |
-| Tests | `src/test/kotlin/com/el_giancar/{application,config}/*Test.kt`, `infrastructure/http/HealthRouteTest.kt` | Exhaustive pair tables, canonical phrase checks, environment parsing, and the health route. |
+| Tests | `src/test/kotlin/com/el_giancar/{application,config}/*Test.kt`, `infrastructure/{http,telegram}/` | Exhaustive pair tables, canonical phrases, message formatting, move parsing, environment parsing, and the health route. |
 | Logging | `src/main/resources/logback.xml` | Console appender; root level `info`. |
 | API spec | `src/main/resources/openapi/documentation.yaml` | Description of `/healthz`; not referenced by code. |
 | CI | `.github/workflows/ci.yml` | Builds and tests on push/PR. |
@@ -51,7 +57,7 @@ sequenceDiagram
     Main->>Ktor: embeddedServer(..., port)
     Main->>Ktor: start(wait = false)
     Ktor->>Ktor: routing { GET /healthz }
-    Main->>TG: runBlocking { runTelegramBot(token, services, locks) }
+    Main->>TG: runBlocking { runTelegramBot(token, games, locks) }
     TG->>API: telegramBot(token), getMe()
     TG->>API: buildBehaviourWithLongPolling (getUpdates loop)
     Note over TG,API: join() keeps the coroutine alive
@@ -71,9 +77,10 @@ child.
 sequenceDiagram
     participant U as User
     participant TG as Telegram Bot API
-    participant B as Bot handler
+    participant B as GameFlow
     participant L as Per-chat mutex
     participant S as Game service
+    participant M as Messages
 
     U->>TG: /sheldon_game
     TG-->>B: update (long polling)
@@ -81,13 +88,15 @@ sequenceDiagram
     alt chat is busy
         B->>TG: "A game is already in progress..."
     else lock acquired
-        B->>TG: "Send me your choose" + reply keyboard
+        B->>TG: "Your move!" + reply keyboard
         U->>TG: spock (lowercase is accepted)
         TG-->>B: text update (same chat)
         B->>B: trim + case-insensitive match
         B->>S: play(SPOCK)
-        S->>S: random move + winningPhrases lookup
-        S-->>B: "You win! ..." / "It's a tie!" / "You lose! ..."
+        S->>S: random move + winning phrase lookup
+        S-->>B: RoundResult(playerMove, botMove, outcome, rulePhrase)
+        B->>M: resultMessage(result)
+        M-->>B: "You: Spock\nMe: Rock\n\n🎉 You win! Spock vaporizes Rock."
         B->>TG: result + commands keyboard
         B->>L: unlock(chatId)
     end
@@ -101,38 +110,63 @@ Key points:
   explicit `it.chat.id == message.chat.id` check as a second safety net.
 - A `ConcurrentHashMap<Long, Mutex>` serializes games per chat. Different chats run
   independently.
-- Input is trimmed and matched case-insensitively against the enum names. Invalid
-  input gets a hint and up to `MAX_MOVE_ATTEMPTS` (3) tries; any command cancels the
-  game. No state is persisted.
+- `GameFlow` wraps the prompt loop in `withTimeoutOrNull(2.minutes)`. A game that
+  receives no move releases the lock and tells the user it timed out.
+- Input is trimmed and matched case-insensitively against the moves' display names.
+  Invalid input gets a hint and up to three tries; any command cancels the game. No
+  state is persisted.
 
 ## Domain model
 
-Two enums model legal moves:
+Every move implements `Move`, which supplies a human-readable `displayName`:
 
 ```kotlin
-enum class ClassicMoveType { PAPER, ROCK, SCISSORS }
-enum class SheldonMoveType { PAPER, ROCK, SCISSORS, LIZARD, SPOCK }
+interface Move {
+    val displayName: String
+}
+
+enum class ClassicMoveType(override val displayName: String) : Move {
+    ROCK("Rock"), PAPER("Paper"), SCISSORS("Scissors")
+}
+
+enum class SheldonMoveType(override val displayName: String) : Move {
+    ROCK("Rock"), PAPER("Paper"), SCISSORS("Scissors"),
+    LIZARD("Lizard"), SPOCK("Spock")
+}
 ```
 
-The Telegram layer parses text into an enum value; the services only accept enums.
-Button labels are the enum `name`s.
+A resolved round is data, not prose:
+
+```kotlin
+data class RoundResult<out M : Move>(
+    val playerMove: M,
+    val botMove: M,
+    val outcome: GameOutcome,   // WIN, LOSE, TIE
+    val rulePhrase: String?,    // e.g. "Rock crushes Scissors"; null for a tie
+)
+```
+
+The Telegram layer parses text (case-insensitive, by `displayName`) into an enum
+value; the services only accept enums. Reply buttons use `displayName`, so users see
+`Rock` rather than `ROCK`.
 
 ### Winner resolution
 
-Both services hold a `winningPhrases` map keyed by `(winner, loser)`:
+`GameRules<M>` owns the legal moves and a `phrases` map keyed by `(winner, loser)`:
 
-- `ClassicGameService`: 3 pairs.
-- `SheldonGameService`: 10 pairs.
+- `ClassicRules`: 3 pairs.
+- `SheldonRules`: 10 pairs.
 
-A round is resolved by looking up `(player, computer)` and `(computer, player)`:
+`GameService<M>` resolves a round by looking up `(player, bot)` and `(bot, player)`:
 
-- equal moves → tie;
-- `(player, computer)` present → player wins with that phrase;
-- `(computer, player)` present → computer wins with that phrase;
+- equal moves → `TIE`, no phrase;
+- `(player, bot)` present → `WIN` with that phrase;
+- `(bot, player)` present → `LOSE` with that phrase;
 - anything else → `error(...)`, which indicates a missing rule.
 
-Each service also exposes a deterministic `play(playerMove, computerMove)` overload.
-This keeps tests free of randomness. The random overload picks with
+`ClassicGameService` and `SheldonGameService` only bind the generic service to their
+rule set. Each service also exposes a deterministic `play(playerMove, botMove)`
+overload. This keeps tests free of randomness. The random overload picks with
 `java.util.Random` (injectable via the constructor).
 
 ## Error handling
@@ -140,6 +174,7 @@ This keeps tests free of randomness. The random overload picks with
 - Missing `BOT_TOKEN` fails at startup with an actionable message.
 - Unknown moves are re-prompted (max 3 attempts), then the game is cancelled cleanly.
 - Sending a command while a game is pending cancels the game and releases the lock.
+- A game with no move for two minutes times out, tells the user, and releases the lock.
 - A second game in the same chat is rejected without disturbing the first.
 - Telegram/network failures still propagate to the handler coroutine; there is no
   retry/backoff layer.
@@ -184,9 +219,11 @@ Notes:
   makes the rules unit-testable.
 - **Typed service API.** Enums instead of strings remove an entire class of parsing
   bugs (case, unknown moves, wrong enum set).
-- **Prose in services.** Win/lose strings are returned directly by the services
-  instead of being rendered in the Telegram layer. This couples text to logic but
-  keeps handlers tiny.
+- **Typed results, presentation in the adapter.** Services return `RoundResult`;
+  `Messages.kt` turns it into text. Game rules stay free of wording and the bot can
+  change its voice without touching the rules.
+- **One shared round resolver.** `GameService` implements win/lose/tie once; the two
+  variants only supply a rule set.
 - **Long polling over webhooks.** Simpler ops, no TLS termination or public URL.
 - **No shared game state.** Rounds are independent; only the per-chat mutex map is
   in memory. Adding scores would require a store and a per-chat/user key.
@@ -196,8 +233,9 @@ Notes:
 | Goal | Where to change |
 | --- | --- |
 | New command | `infrastructure/telegram/TelegramBot.kt` (`onCommand`) + `Keyboards.kt` + `Messages.kt` |
-| New move | relevant `domain/*MoveType.kt`, service `winningPhrases`, keyboard, `/rules`, tests, docs |
-| Game timeout | wrap `awaitMove(...)` in `withTimeoutOrNull` and always release the mutex in `finally` |
+| New move | relevant `domain/*MoveType.kt` (enum + `displayName`), the variant's `phrases` map, `/rules`, tests, docs |
+| Change the bot's wording | `infrastructure/telegram/Messages.kt` only |
+| Change the game timeout | `GameFlow`'s `gameTimeout` parameter |
 | Better randomness / tests | pass a seeded `Random` to the service constructor, or keep using the deterministic overload |
 | Scores / persistence | Introduce a repository keyed by `chat.id`/`user.id`; keep it out of the stateless services |
 | Serve the OpenAPI spec | Add a route that reads `openapi/documentation.yaml`, or use Ktor's OpenAPI plugin |
