@@ -170,7 +170,7 @@ src/test/kotlin/com/el_giancar/
 ├── application/                       # game-rule tests
 ├── config/                            # environment config tests
 ├── infrastructure/http/               # /healthz route test
-├── infrastructure/logging/            # log redaction test
+├── infrastructure/logging/            # log redaction + JUL bridge tests
 └── infrastructure/telegram/           # message + move parser tests
 ```
 
@@ -184,7 +184,8 @@ src/test/kotlin/com/el_giancar/
   workflow mitigates this, but scheduled runs can be delayed.
 - tgbotapi logs a timeout every 30 seconds while the bot is idle because its client
   request timeout equals Telegram's long-poll timeout. Log output redacts the bot
-  token; the polling loop recovers on the next request.
+  token (JUL is bridged to SLF4J so tgbotapi's logs use the same pattern); the polling
+  loop recovers on the next request.
 - The previously committed bot token was purged from git history, but it must still
   be treated as compromised and rotated with @BotFather.
 

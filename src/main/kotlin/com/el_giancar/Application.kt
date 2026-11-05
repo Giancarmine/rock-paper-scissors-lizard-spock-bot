@@ -5,12 +5,17 @@ import com.el_giancar.application.ClassicGameService
 import com.el_giancar.application.SheldonGameService
 import com.el_giancar.config.AppConfig
 import com.el_giancar.infrastructure.http.healthRoutes
+import com.el_giancar.infrastructure.logging.installJulToSlf4jBridge
 import com.el_giancar.infrastructure.telegram.runTelegramBot
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import kotlinx.coroutines.runBlocking
 
 fun main() {
+    // Must run before the Telegram client logs anything: tgbotapi uses
+    // java.util.logging, which would otherwise bypass Logback's token redaction.
+    installJulToSlf4jBridge()
+
     val config = AppConfig.fromEnvironment()
 
     // Start the HTTP server first so /healthz is reachable while the bot runs.

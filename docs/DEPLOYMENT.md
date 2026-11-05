@@ -114,11 +114,17 @@ Use this after a leak or a scheduled rotation:
    ```
 5. Send `/start` to the bot to verify it responds.
 6. Check `https://<your-service>.onrender.com/healthz` returns `OK`.
-7. Confirm Render logs no longer contain the old token. tgbotapi includes the
-   request URL (and therefore the token) in its error messages, so
-   `src/main/resources/logback.xml` redacts `bot<id>:<secret>` before writing logs.
+7. Confirm new Render log lines no longer contain the token. Wait for the next
+   `HttpRequestTimeoutException`, then check for `bot<redacted>`. tgbotapi includes
+   the request URL (and therefore the token) in error messages, so
+   `src/main/resources/logback.xml` redacts `bot<id>:<secret>` and
+   `installJulToSlf4jBridge()` routes tgbotapi's `java.util.logging` records through
+   Logback. Older log lines keep the previously leaked value until log retention
+   expires; revoking the token is what neutralizes them.
 
-No code change or commit is needed for a rotation.
+No code change or commit is needed for a rotation, but the deployed build must
+include the jul-to-slf4j bridge. Rotate only after that build is live; otherwise the
+new token is written to the logs again.
 
 ## Security notes
 
@@ -128,9 +134,13 @@ No code change or commit is needed for a rotation.
   `curl` to keep it out of process arguments where practical.
 - GitHub masks secret values in logs, but avoid printing them anyway.
 - Runtime logs are written by the app, not by GitHub. tgbotapi includes the Telegram
-  request URL (which contains the token) in error messages, so
-  `logback.xml` applies a redaction pattern to every message and stack trace. Do not
-  remove that pattern. If a token still appears in Render logs, rotate it immediately.
+  request URL (which contains the token) in error messages, so `logback.xml` applies a
+  redaction pattern to every message and stack trace. tgbotapi logs through kslog,
+  which uses `java.util.logging` on the JVM; `installJulToSlf4jBridge()` installed in
+  `Application.kt` routes those records through Logback. Do not remove either the
+  pattern or the bridge: without the bridge, JUL records bypass Logback and the token
+  is logged in plaintext. If a token still appears in Render logs, rotate it
+  immediately and check that the deployed build installs the bridge.
 - A token that was ever committed is compromised even after history is rewritten:
   rotate it, and remember that forks/clones/caches may retain the old value.
 - Render environment groups are not updated by this workflow; it only updates
