@@ -27,7 +27,7 @@ suspend fun runTelegramBot(
 
     bot.buildBehaviourWithLongPolling {
         val me = bot.getMe()
-        logger.info("Connected to Telegram as @{}", me.username)
+        logger.info("Connected to Telegram as {}", me.username)
 
         onCommand("start") { message ->
             replyTo(message, startMessage, commandsKeyboard())
