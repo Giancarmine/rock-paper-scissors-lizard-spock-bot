@@ -85,6 +85,11 @@ without inbound traffic; outbound long polling alone does not keep them awake. T
 - GitHub scheduled workflows can be delayed, especially at high load. If the service
   does sleep, the next ping wakes it; Telegram retains updates for 24 hours, so
   messages are delivered late rather than lost.
+- A cold start can take several minutes. The workflow's curl retry budget is 8m45s
+  (`4 × 120s` plus `3 × 15s`) and its job timeout is 10 minutes, so a wake-up attempt
+  is not cut off. Keep the job timeout above the curl budget if you tune either value.
+- `cancel-in-progress` is `false`: a run that is waiting for a sleeping service must
+  be allowed to finish, so a newer scheduled run queues instead of cancelling it.
 - Update `HEALTHCHECK_URL` in the workflow if the service URL changes. Remove the
   workflow after moving to a paid plan that does not sleep.
 - Scheduled workflows are disabled after 60 days without repository activity; a
