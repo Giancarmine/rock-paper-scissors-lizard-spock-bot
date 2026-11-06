@@ -43,8 +43,9 @@ Docker image.
 | anything else | Replies with a hint to use `/commands`. |
 
 During a game, the move keyboard includes `/cancel`; any other command also cancels.
-Outside a game, plain text in a private chat gets a hint to start a game, while group
-chats are not interrupted.
+Invalid moves get a hint with the remaining tries; after three invalid moves the game
+is cancelled. Outside a game, plain text in a private chat gets a hint to start a game,
+while group chats are not interrupted.
 
 ## Rules
 
