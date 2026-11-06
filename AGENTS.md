@@ -161,8 +161,10 @@ Application.kt                        main(): reads config, starts Ktor
 5. The game service resolves the round and returns a typed `RoundResult`.
 6. `Messages.resultMessage(...)` renders both moves and the outcome; the bot sends it
    together with the commands keyboard in a single message.
-7. `/start`, `/rules`, `/help`, `/about`, `/commands` reply directly; unknown
-   commands get a hint via `onUnhandledCommand`.
+7. `/start`, `/rules`, `/help`, `/about`, `/commands` reply directly; `/cancel` reports
+   that no game is running when the chat is idle (during a game the `GameFlow` prompt
+   already consumes it as a cancellation); unknown commands get a hint via
+   `onUnhandledCommand`.
 
 There is **no state**: no database, no scores, no sessions, no per-chat storage.
 Each command is a short-lived coroutine; the only shared state is the in-memory
@@ -216,6 +218,11 @@ derived by looking up the pair in the opposite order.
 - `waitTextMessage()` expects the update flow of the command's subcontext. Command
   handlers already filter by chat (`MessageFilterByChat`); the explicit chat-id check
   is a second safety net. Do not remove either without evaluating concurrency.
+- tgbotapi broadcasts each update to every trigger and to `waitTextMessage()`. During
+  a game, `/cancel` reaches both the registered handler and the prompt loop, so the
+  handler deliberately stays silent while `ChatLocks.isBusy(chatId)` is true; the
+  prompt loop sends the single cancellation reply. Without that guard the user gets
+  two messages.
 - `ChatIdentifier`/`ChatId` is a value class; the mutex map is keyed by the underlying
   `Long` (`message.chat.id.chatId.long`).
 - Input is matched against `displayName`, not the enum `name`. Adding a move without

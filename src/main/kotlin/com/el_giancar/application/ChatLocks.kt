@@ -12,4 +12,12 @@ class ChatLocks {
     private val locks = ConcurrentHashMap<Long, Mutex>()
 
     fun forChat(chatId: Long): Mutex = locks.computeIfAbsent(chatId) { Mutex() }
+
+    /**
+     * Whether a game currently holds the chat lock.
+     *
+     * Unlike [forChat] this does not create an entry, so asking about a chat that
+     * never played does not grow the map.
+     */
+    fun isBusy(chatId: Long): Boolean = locks[chatId]?.isLocked == true
 }

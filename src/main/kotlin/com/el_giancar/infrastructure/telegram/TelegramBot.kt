@@ -97,6 +97,16 @@ suspend fun runTelegramBot(
                     replyTo(message, commandsMenuMessage, commandsKeyboard())
                 }
 
+                onCommand("cancel") { message ->
+                    // While a game is running, GameFlow receives the same text message
+                    // and replies with cancelledMessage; replying here too would send
+                    // two messages. Outside a game, explain that there is nothing to
+                    // cancel instead of falling through to the unknown-command hint.
+                    if (!chatLocks.isBusy(message.chat.id.chatId.long)) {
+                        replyTo(message, noActiveGameMessage, commandsKeyboard())
+                    }
+                }
+
                 onUnhandledCommand { message ->
                     replyTo(message, unknownCommandMessage, unhandledCommandKeyboard())
                 }

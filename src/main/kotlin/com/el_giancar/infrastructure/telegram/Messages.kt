@@ -32,12 +32,13 @@ internal val helpMessage = """
     |
     |/classic_game — Rock, Paper, Scissors
     |/sheldon_game — Rock, Paper, Scissors, Lizard, Spock
+    |/cancel — cancel the current game
     |/rules — show the winning moves
     |/commands — show the command keyboard
     |/about — about this bot
     |/help — show this message
     |
-    |During a game, send any command to cancel it.
+    |During a game, send /cancel (or any other command) to cancel it.
 """.trimMargin()
 
 internal val aboutMessage = """
@@ -55,6 +56,9 @@ internal val busyMessage =
 
 internal val cancelledMessage = "🚫 Game cancelled. Start a new one whenever you're ready."
 
+internal val noActiveGameMessage =
+    "🤔 There's no game in progress in this chat. Start one with /classic_game or /sheldon_game."
+
 internal val timeoutMessage = "⌛ This game timed out. Start a new one whenever you're ready."
 
 internal val tooManyAttemptsMessage =
@@ -67,7 +71,7 @@ internal fun movePrompt(moves: List<Move>): String = """
     |🎮 Your move!
     |
     |Tap a button below or type one of: ${moves.joinToString(", ") { it.displayName }}.
-    |Any command cancels the game.
+    |Send /cancel (or any other command) to cancel the game.
 """.trimMargin()
 
 internal fun unknownMoveMessage(moves: List<Move>, input: String): String =

@@ -31,6 +31,9 @@ internal fun <M : Move> movesKeyboard(moves: List<M>): ReplyKeyboardMarkup = rep
             simpleButton(move.displayName)
         }
     }
+    row {
+        simpleButton("/cancel")
+    }
 }
 
 internal fun unhandledCommandKeyboard(): ReplyKeyboardMarkup = replyKeyboard(

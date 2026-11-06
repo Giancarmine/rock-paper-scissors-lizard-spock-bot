@@ -16,6 +16,7 @@ Docker image.
 - `/rules` prints the full rules with a consistent, friendly tone.
 - Case-insensitive input with up to three attempts before the game is cancelled.
 - One game per chat at a time, with a two-minute timeout so a chat cannot stay locked.
+- `/cancel` stops the current game, and explains when there is nothing to cancel.
 - `/healthz` and `/readyz` HTTP endpoints for hosting platforms and monitors.
 - No accounts, scores, or database — every round is independent.
 - Uses Telegram long polling, so no public URL or webhook is required.
@@ -28,12 +29,13 @@ Docker image.
 | `/rules` | Rules of Rock–Paper–Scissors–Lizard–Spock. |
 | `/classic_game` | Play with Rock, Paper, Scissors. |
 | `/sheldon_game` | Play with Rock, Paper, Scissors, Lizard, Spock. |
+| `/cancel` | Cancel the current game (or report that none is running). |
 | `/help` | List the available commands. |
 | `/about` | About the bot and its source. |
 | `/commands` | Show the command keyboard. |
 | anything else | Replies with a hint to use `/commands`. |
 
-During a game, sending any command cancels the current round.
+During a game, the move keyboard includes `/cancel`; any other command also cancels.
 
 ## Rules
 
