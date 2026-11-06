@@ -71,8 +71,9 @@ export BOT_TOKEN="<your-token>"
 ./gradlew buildFatJar    # build/libs/rock-paper-scissors-lizard-spock-bot-all.jar
 java -jar build/libs/rock-paper-scissors-lizard-spock-bot-all.jar
 
-curl http://localhost:8080/healthz   # -> OK
-curl http://localhost:8080/readyz    # -> READY once Telegram is connected
+curl http://localhost:8080/healthz      # -> OK
+curl http://localhost:8080/readyz       # -> READY once Telegram is connected
+curl http://localhost:8080/openapi.yaml # -> OpenAPI 3.0 document
 ```
 
 Docker:
@@ -299,11 +300,10 @@ format, so update it together with the wording.
 
 ### Add tests
 
-Tests live in `src/test/kotlin`. Use `kotlin.test` on JUnit 5 (`kotlin-test-junit5` is
-already declared). Prefer the deterministic `play(player, bot)` overload; no random
-stubbing is required. Add message/parser tests under
-`src/test/kotlin/com/el_giancar/infrastructure/telegram/`. Run with
-`./gradlew test`.
+Tests live in `src/test/kotlin`. Use `kotlin.test` on the JUnit Platform (Jupiter 6;
+`kotlin-test-junit5` is already declared). Prefer the deterministic `play(player, bot)`
+overload; no random stubbing is required. Add message/parser tests under
+`src/test/kotlin/com/el_giancar/infrastructure/telegram/`. Run with `./gradlew test`.
 
 ### Change configuration
 

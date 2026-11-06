@@ -15,7 +15,7 @@ is both a changelog of the review and a list of what still needs owner action.
 | 6 | Packaging | `EXPOSE 8080:8080`, build/runtime JDK mismatch, unused `ARG TOKEN`, hardcoded jar name, `gradle build` vs fat jar | Multi-stage JDK build with `buildFatJar`, matching runtime, `EXPOSE 8080`, runtime `BOT_TOKEN`, stable `/app/app.jar`. Current images use JDK 21. |
 | 7 | Dependencies | Unused/out-of-sync `ktor-client-okhttp:2.0.1` | Removed. |
 | 8 | Correctness | Unreachable `else` branches re-rolled the RNG | Replaced by a single `error(...)` path in rule lookup. |
-| 9 | API surface | OpenAPI spec described non-existent routes; no health endpoint | Added `GET /healthz`; the spec now documents only that endpoint. |
+| 9 | API surface | OpenAPI spec described non-existent routes; no health endpoint | Added `GET /healthz` and aligned the spec with the served routes. `/readyz` and `/openapi.yaml` were added later (rows 16 and 21). |
 | 10 | Process | No tests or CI; noisy `trace` logging | Added exhaustive service tests, a health-route test, a GitHub Actions workflow, and `info` logging. |
 | 11 | Security | Token remained recoverable from git history | History rewritten with `git filter-repo` and force-pushed; the commit contents are otherwise unchanged. |
 | 12 | Security | tgbotapi error messages contain the request URL, so runtime logs exposed the token | `logback.xml` redacts `bot<id>:<secret>` from messages and stack traces; a test guards the behavior. |
@@ -85,5 +85,9 @@ for the rotation runbook.
   `/openapi.yaml` returned `200 application/yaml`, and the idle logs stayed free of
   `HttpRequestTimeoutException` and raw tokens. The earlier
   `dep-dbmkhubm8hqs73ansl0g` deploy was verified the same way.
-- Runtime smoke test of the Telegram path requires a valid token and was not
-  performed.
+- The running image corresponds to `8c984f4`; commits after it are documentation-only
+  updates (including the deploy record), so no redeploy is required for them.
+- Runtime verification of the Telegram path: the Render logs show
+  `Connected to Telegram as @RockPaperScissorsLizardSpockBot`, and `/readyz` returned
+  `READY`. An interactive `/start` exchange still requires the owner's Telegram
+  client.

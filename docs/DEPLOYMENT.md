@@ -3,6 +3,7 @@
 The bot is a long-running process that uses Telegram **long polling**. On Render it
 runs as a Docker web service; Render requires a bound HTTP port, which the bot
 provides with `GET /healthz` (liveness) and `GET /readyz` (Telegram connectivity).
+`GET /openapi.yaml` serves the bundled API description.
 
 ## How deployment works
 
@@ -115,16 +116,20 @@ Use this after a leak or a scheduled rotation:
    render deploys list srv-xxxxxxxxxxxxxxxx -o text
    ```
 5. Send `/start` to the bot to verify it responds.
-6. Check `https://<your-service>.onrender.com/healthz` returns `OK` and
+6. Check `https://<your-service>.onrender.com/healthz` returns `OK`,
    `https://<your-service>.onrender.com/readyz` returns `READY` (503 until the bot
-   has connected to Telegram).
-7. Confirm new Render log lines no longer contain the token. Wait for the next
-   `HttpRequestTimeoutException`, then check for `bot<redacted>`. tgbotapi includes
-   the request URL (and therefore the token) in error messages, so
+   has connected to Telegram), and `https://<your-service>.onrender.com/openapi.yaml`
+   returns the bundled YAML document.
+7. Confirm new Render log lines no longer contain the token. The expected idle
+   `getUpdates` timeout is dropped by `ExpectedLongPollTimeoutFilter`, so do not wait
+   for an `HttpRequestTimeoutException` to validate redaction. Any other tgbotapi
+   error that includes the request URL should render it as `bot<redacted>`.
+   tgbotapi includes the request URL (and therefore the token) in error messages, so
    `src/main/resources/logback.xml` redacts `bot<id>:<secret>` and
    `installJulToSlf4jBridge()` routes tgbotapi's `java.util.logging` records through
-   Logback. Older log lines keep the previously leaked value until log retention
-   expires; revoking the token is what neutralizes them.
+   Logback. `LogbackConfigTest` covers the pattern. Older log lines keep the
+   previously leaked value until log retention expires; revoking the token is what
+   neutralizes them.
 
 No code change or commit is needed for a rotation, but the deployed build must
 include the jul-to-slf4j bridge. Rotate only after that build is live; otherwise the
@@ -159,6 +164,7 @@ new token is written to the logs again.
 | Deploy stays queued or fails | Check the Render deploy logs; the service may need a plan/region change. |
 | Bot starts but does not answer | The token is invalid/revoked, or the service cannot reach `api.telegram.org`. |
 | Bot does not answer after a quiet period | The free service slept; check the `Keep alive` workflow and wake it with `curl https://<your-service>.onrender.com/readyz`. |
-| Render logs show `HttpRequestTimeoutException` every 30 seconds | tgbotapi's client timeout equals the long-poll timeout while idle. The token is redacted; the bot keeps polling. |
+| Render logs show repeated `HttpRequestTimeoutException` lines | The expected idle `getUpdates` timeout is filtered. Repeated lines mean a different request is timing out or the deployed build predates `ExpectedLongPollTimeoutFilter`; check the URL in the message and redeploy if needed. The token stays redacted. |
 | `/healthz` returns 404 | The deployed revision predates the health route; redeploy. |
+| `/openapi.yaml` returns 404 | The deployed revision predates `OpenApiRoutes`; redeploy a current build. |
 | `/readyz` returns 503 while `/healthz` returns 200 | The process is up but the Telegram connection failed (revoked token, blocked network, or Telegram outage). Check the startup log and Render logs. The bot re-checks every 60 seconds. |
