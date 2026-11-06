@@ -2,9 +2,9 @@ openapi: "3.0.3"
 info:
   title: "rock-paper-scissors-lizard-spock-bot"
   description: >-
-    Health endpoints of the Telegram bot process. The bot itself communicates
-    through Telegram long polling and exposes no other HTTP API.
-  version: "1.0.0"
+    Health and metadata endpoints of the Telegram bot process. The bot itself
+    communicates through Telegram long polling and exposes no other HTTP API.
+  version: "1.1.0"
 paths:
   /healthz:
     get:
@@ -48,3 +48,16 @@ paths:
               examples:
                 Example#1:
                   value: "NOT READY"
+  /openapi.yaml:
+    get:
+      summary: OpenAPI document
+      description: >-
+        Returns this document. The YAML is bundled with the application and
+        served from memory, so it always matches the deployed build.
+      responses:
+        "200":
+          description: "The OpenAPI document in YAML format."
+          content:
+            application/yaml:
+              schema:
+                type: "string"

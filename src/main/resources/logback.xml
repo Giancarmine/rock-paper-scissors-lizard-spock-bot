@@ -1,4 +1,10 @@
 <configuration>
+    <!--
+        Drop the expected HttpRequestTimeoutException that tgbotapi logs on every
+        idle getUpdates long-poll cycle. Everything else still reaches STDOUT.
+    -->
+    <turboFilter class="com.el_giancar.infrastructure.logging.ExpectedLongPollTimeoutFilter"/>
+
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <!--

@@ -6,6 +6,7 @@ import com.el_giancar.application.ReadinessState
 import com.el_giancar.application.SheldonGameService
 import com.el_giancar.config.AppConfig
 import com.el_giancar.infrastructure.http.healthRoutes
+import com.el_giancar.infrastructure.http.openApiRoutes
 import com.el_giancar.infrastructure.logging.installJulToSlf4jBridge
 import com.el_giancar.infrastructure.telegram.runTelegramBot
 import io.ktor.server.engine.embeddedServer
@@ -25,6 +26,7 @@ fun main() {
     // process exits and the server is stopped.
     val server = embeddedServer(Netty, port = config.port, host = "0.0.0.0") {
         healthRoutes(readiness)
+        openApiRoutes()
     }
     server.start(wait = false)
 
