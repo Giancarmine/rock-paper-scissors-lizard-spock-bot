@@ -1,0 +1,75 @@
+name: Bug report
+description: Report a reproducible problem with the bot or its HTTP endpoints.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **Do not include a bot token, Render API key, or other
+        secret.** Redact URLs that look like
+        `https://api.telegram.org/bot<id>:<secret>/...` and use `bot<redacted>` instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the problem and its impact.
+      placeholder: The bot replied with ... instead of ...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can someone else trigger the problem?
+      placeholder: |
+        1. Send /classic_game
+        2. Send "Rock"
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include the exact reply or HTTP status when possible.
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Where did it happen?
+      options:
+        - Render deployment (free plan)
+        - Local Gradle run
+        - Docker image
+        - Tests or CI
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit or deployment
+      description: The commit SHA, Render deploy ID, or date.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste only the relevant lines and redact secrets.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and docs/KNOWN_ISSUES.md.
+          required: true
+        - label: I removed all tokens, secrets, and personal data from this report.
+          required: true

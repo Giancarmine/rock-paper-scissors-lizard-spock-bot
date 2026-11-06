@@ -47,4 +47,23 @@ class LogbackConfigTest {
             context.stop()
         }
     }
+
+    @Test
+    fun `registers the idle long poll timeout filter`() {
+        val context = LoggerContext()
+        try {
+            val configurator = JoranConfigurator()
+            configurator.context = context
+            context.reset()
+            val config = requireNotNull(javaClass.classLoader.getResource("logback.xml"))
+            configurator.doConfigure(config)
+
+            assertTrue(
+                context.turboFilterList.any { it is ExpectedLongPollTimeoutFilter },
+                "logback.xml must register ExpectedLongPollTimeoutFilter",
+            )
+        } finally {
+            context.stop()
+        }
+    }
 }

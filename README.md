@@ -1,5 +1,10 @@
 # Rock–Paper–Scissors–Lizard–Spock Bot
 
+[![CI](https://github.com/Giancarmine/rock-paper-scissors-lizard-spock-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/Giancarmine/rock-paper-scissors-lizard-spock-bot/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.4.21-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
+[![JVM](https://img.shields.io/badge/JVM-21-007396?logo=openjdk&logoColor=white)](https://adoptium.net/)
+
 A small Telegram bot that plays **Rock–Paper–Scissors** and the extended
 **Rock–Paper–Scissors–Lizard–Spock** variant against you. It picks a random move
 and answers with a human-readable result.
@@ -19,6 +24,7 @@ Docker image.
 - `/cancel` stops the current game, and explains when there is nothing to cancel.
 - Plain text in an idle private chat gets a short hint instead of silence; group chats are left alone.
 - `/healthz` and `/readyz` HTTP endpoints for hosting platforms and monitors.
+- `/openapi.yaml` serves the HTTP API description from the running process.
 - No accounts, scores, or database — every round is independent.
 - Uses Telegram long polling, so no public URL or webhook is required.
 
@@ -92,8 +98,8 @@ export PORT=8080          # optional
 ```
 
 > `BOT_TOKEN` is required at runtime. `.env` is git-ignored; never commit a real
-> token. The previously committed token was purged from git history, but tokens are
-> compromised once exposed — rotate if a copy still exists anywhere.
+> token. Production tokens live only in GitHub Actions secrets and the hosting
+> platform, never in the repository.
 
 ### Run locally
 
@@ -131,18 +137,22 @@ image.
 `src/test/kotlin` contains exhaustive pair tables for both game modes, checks for the
 canonical winning phrases, formatting tests for the user-facing messages, move parser
 tests, `GameFlow` tests for valid moves, retries, cancellation, timeout and a busy
-chat, and idle-text hint tests. Tests run on JUnit 5 via `kotlin-test-junit5`.
+chat, idle-text hint tests, HTTP route tests for `/healthz`, `/readyz` and
+`/openapi.yaml`, and log-redaction/timeout-filter tests. Tests run on JUnit 5 via
+`kotlin-test-junit5`.
 
 ### Health checks
 
 ```bash
-curl http://localhost:8080/healthz   # OK (liveness)
-curl http://localhost:8080/readyz    # READY once Telegram is connected, else 503
+curl http://localhost:8080/healthz     # OK (liveness)
+curl http://localhost:8080/readyz      # READY once Telegram is connected, else 503
+curl http://localhost:8080/openapi.yaml  # OpenAPI 3.0 document
 ```
 
 `/healthz` only proves the process is up, so a Telegram outage does not cause a
 restart loop. `/readyz` reports whether the bot is connected; the state is set by the
-startup `getMe()` and refreshed every 60 seconds.
+startup `getMe()` and refreshed every 60 seconds. `/openapi.yaml` is read from the
+bundled `openapi/documentation.yaml` once at startup.
 
 ## Project layout
 
@@ -167,7 +177,11 @@ src/main/kotlin/com/el_giancar/
 │   └── ReadinessState.kt              # Telegram connectivity for /readyz
 └── infrastructure/
     ├── http/
-    │   └── HealthRoutes.kt            # GET /healthz + /readyz
+    │   ├── HealthRoutes.kt            # GET /healthz + /readyz
+    │   └── OpenApiRoutes.kt           # GET /openapi.yaml
+    ├── logging/
+    │   ├── JulBridge.kt               # JUL -> SLF4J so token redaction applies
+    │   └── ExpectedLongPollTimeoutFilter.kt # drops idle getUpdates timeouts
     └── telegram/
         ├── TelegramBot.kt             # command wiring + readiness monitor
         ├── GameFlow.kt                # prompt, timeout, lock, result
@@ -182,25 +196,50 @@ src/main/resources/
 src/test/kotlin/com/el_giancar/
 ├── application/                       # game-rule tests
 ├── config/                            # environment config tests
-├── infrastructure/http/               # /healthz and /readyz route tests
-├── infrastructure/logging/            # log redaction + JUL bridge tests
+├── infrastructure/http/               # /healthz, /readyz and /openapi.yaml route tests
+├── infrastructure/logging/            # log redaction, JUL bridge, timeout filter tests
 └── infrastructure/telegram/           # messages, move parser, GameFlow, idle-text tests
 ```
 
 ## Known limitations
 
-- No persistence, scores, or leaderboards.
-- A game that receives no move for two minutes is cancelled automatically; the reply
-  keyboard and the chat lock are released.
-- The OpenAPI document is descriptive only and is not served by the application.
-- On Render's free plan the service sleeps without traffic; the scheduled keep-alive
-  workflow mitigates this, but scheduled runs can be delayed.
-- tgbotapi logs a timeout every 30 seconds while the bot is idle because its client
-  request timeout equals Telegram's long-poll timeout. Log output redacts the bot
-  token (JUL is bridged to SLF4J so tgbotapi's logs use the same pattern); the polling
-  loop recovers on the next request.
-- The previously committed bot token was purged from git history, but it must still
-  be treated as compromised and rotated with @BotFather.
+These are deliberate trade-offs rather than open bugs. See
+[`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) for the full history and the
+verification that backs each item.
+
+**State and scaling**
+
+- **No persistence.** Games, scores, and chat locks live in memory, so every round is
+  independent and a restart forgets in-flight games.
+- **One instance per token.** Telegram long polling allows a single consumer; a second
+  replica would get `409 Conflict`. Horizontal scaling needs webhooks and a shared
+  store.
+- **No retry/backoff for replies.** Telegram or network errors surface to the handler
+  coroutine. The long-poll loop reconnects on the next cycle, but a failed reply is
+  not resent.
+
+**Hosting**
+
+- **Render free-plan sleep.** The service stops after 15 minutes without inbound
+  traffic. The scheduled keep-alive workflow mitigates this, but GitHub can delay
+  scheduled runs, so the first message after a rare sleep may wait for a cold start.
+  Telegram keeps updates for 24 hours, so nothing is lost.
+- **Readiness lags by up to 60 seconds.** `/readyz` reflects the last periodic
+  `getMe()`, not a live call per request.
+
+**Behaviour and logging**
+
+- **Idle long-poll timeout noise.** tgbotapi's HTTP timeout equals Telegram's
+  `getUpdates` timeout, so an idle bot raises `HttpRequestTimeoutException` about
+  every 30 seconds. A Logback filter drops exactly those expected events; other
+  timeouts and errors still appear, and tokens are always redacted.
+- **Pseudo-random moves.** `java.util.Random` is fine for a casual game but not
+  suitable when stakes or fairness guarantees matter.
+- **English only.** Messages and commands are not localised.
+- **Telegram only.** There is no web or mobile front end; HTTP is limited to the
+  health probes and the OpenAPI document.
+- **A game that receives no move for two minutes is cancelled automatically**, and
+  the reply keyboard and chat lock are released.
 
 See [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) for details.
 
@@ -232,6 +271,9 @@ a fork).
 
 ## Documentation for contributors and AI agents
 
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — branch, test, and pull-request workflow.
+- [`SECURITY.md`](SECURITY.md) — private vulnerability reporting and rotation steps.
+- [`CHANGELOG.md`](CHANGELOG.md) — notable changes and release notes.
 - [`AGENTS.md`](AGENTS.md) — instructions for AI coding agents.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — components and update flow.
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Render setup and token rotation.
@@ -239,5 +281,4 @@ a fork).
 
 ## License
 
-No license file is included in this repository. Unless the owner states otherwise,
-treat it as all rights reserved.
+Released under the [MIT License](LICENSE).
