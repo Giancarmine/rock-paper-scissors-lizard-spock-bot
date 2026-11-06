@@ -20,8 +20,9 @@ is both a changelog of the review and a list of what still needs owner action.
 | 11 | Security | Token remained recoverable from git history | History rewritten with `git filter-repo` and force-pushed; the commit contents are otherwise unchanged. |
 | 12 | Security | tgbotapi error messages contain the request URL, so runtime logs exposed the token | `logback.xml` redacts `bot<id>:<secret>` from messages and stack traces; a test guards the behavior. |
 | 15 | Security | tgbotapi logs through kslog, whose JVM backend uses `java.util.logging` directly, bypassing the Logback pattern; the token still appeared in plaintext in Render logs | `installJulToSlf4jBridge()` installs `SLF4JBridgeHandler` at startup so JUL records go through Logback and the redaction pattern. Guarded by `JulBridgeTest`. |
-| 13 | Availability | The free Render service sleeps after 15 minutes without traffic, stopping long polling | `keepalive.yml` pings `/healthz` every 5 minutes; documented in `DEPLOYMENT.md`. The job allows 10 minutes and the curl retries allow 8m45s, so a cold start is not cancelled mid-wake-up. |
+| 13 | Availability | The free Render service sleeps after 15 minutes without traffic, stopping long polling | `keepalive.yml` pings `/readyz` every 5 minutes; documented in `DEPLOYMENT.md`. The job allows 10 minutes and the curl retries allow 8m45s, so a cold start is not cancelled mid-wake-up. |
 | 14 | UX / Architecture | User-facing prose lived in the game services, move labels were enum names, `TelegramBot` mixed wiring/parsing/flow, and an abandoned game locked the chat forever | Services return typed `RoundResult`; `Messages.kt` renders all text; moves have `displayName`; `GameFlow` + `MoveParser` split the adapter; games time out after two minutes. |
+| 16 | Observability | `/healthz` only proved the HTTP server was up, so a dead Telegram session or revoked token still looked healthy | Added `/readyz`: `200` when connected, `503` otherwise. Readiness is set by the startup `getMe()` and refreshed by a 60-second `getMe()` monitor. `/healthz` stays a liveness probe so a Telegram outage does not cause a restart loop. |
 
 ## Still requires owner action
 
@@ -47,7 +48,8 @@ compromised.
 2. Store it as the GitHub secret: `gh secret set BOT_TOKEN`.
 3. Run `gh workflow run deploy-render.yml` to update the Render environment variable
    and redeploy.
-4. Verify `/healthz` and send `/start` to the bot.
+4. Verify `/healthz` returns `OK`, `/readyz` returns `READY`, and send `/start` to the
+   bot.
 5. Wait for a new `HttpRequestTimeoutException` line, then check that Render logs show
    `bot<redacted>` and no token value. Old log lines keep the value until retention
    expires, so rotate after the bridge is deployed.
@@ -70,15 +72,15 @@ without explicit approval and coordination with everyone who has a clone.
   and updates are not lost. The jul-to-slf4j bridge routes these records through the
   Logback redaction pattern so the token stays out of the logs.
 - **Render free-plan sleep.** The service stops after 15 minutes without inbound
-  traffic. `.github/workflows/keepalive.yml` pings `/healthz` every 5 minutes, but
+  traffic. `.github/workflows/keepalive.yml` pings `/readyz` every 5 minutes, but
   GitHub can delay scheduled runs. Updates remain queued in Telegram for 24 hours.
+- **Readiness lags a real outage by up to 60 seconds.** The periodic `getMe()` check
+  runs every 60 seconds; `/readyz` does not call Telegram on each request.
 - **The per-chat mutex map is never evicted.** Entries are small, but the map grows
   with the number of distinct chats seen since startup.
 - **`/cancel` is not a registered command.** During a game any command cancels, but
   outside a game `/cancel` falls through to the generic "use /commands" reply. Add a
   handler if that is confusing.
-- **The health endpoint only proves the HTTP server is up.** It does not verify that
-  long polling is connected to Telegram.
 
 ## Verification performed
 
@@ -86,11 +88,12 @@ without explicit approval and coordination with everyone who has a clone.
 - `grep` for the old token: absent from tracked files and from every commit after the
   `git filter-repo` rewrite; the rewritten HEAD tree matches the pre-rewrite tree.
 - Unit tests added for all 9 classic pairs and all 25 Sheldon pairs, typed outcomes,
-  canonical phrase checks, exact message formatting, move parsing, and a
-  `testApplication` check for `GET /healthz`.
+  canonical phrase checks, exact message formatting, move parsing, and
+  `testApplication` checks for `GET /healthz` and both states of `GET /readyz`.
 - `./gradlew clean test buildFatJar` passes with Temurin JDK 21; the fat jar starts
   and fails fast with a clear message when `BOT_TOKEN` is missing.
-- The `/healthz` route was smoke-tested against a running fat jar.
+- The `/healthz` and `/readyz` routes were smoke-tested against a running fat jar
+  and against the deployed Render service.
 - The logback configuration is tested with a fake bot token in a message and a stack
   trace; the output contains `bot<redacted>` and not the token.
 - Render deploy `dep-dbm7vl942hec73dtvg3g` (commit `a93437c`) reached **Live** and

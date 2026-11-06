@@ -16,7 +16,7 @@ Docker image.
 - `/rules` prints the full rules with a consistent, friendly tone.
 - Case-insensitive input with up to three attempts before the game is cancelled.
 - One game per chat at a time, with a two-minute timeout so a chat cannot stay locked.
-- `/healthz` HTTP endpoint for hosting platforms.
+- `/healthz` and `/readyz` HTTP endpoints for hosting platforms and monitors.
 - No accounts, scores, or database — every round is independent.
 - Uses Telegram long polling, so no public URL or webhook is required.
 
@@ -96,8 +96,8 @@ export PORT=8080          # optional
 ./gradlew run
 ```
 
-The process starts Ktor on `0.0.0.0:8080` (only `/healthz` is exposed) and then
-begins Telegram long polling. Send `/start` to your bot.
+The process starts Ktor on `0.0.0.0:8080` (only `/healthz` and `/readyz` are
+exposed) and then begins Telegram long polling. Send `/start` to your bot.
 
 ### Build a jar
 
@@ -127,11 +127,16 @@ image.
 canonical winning phrases, formatting tests for the user-facing messages, and move
 parser tests. Tests run on JUnit 5 via `kotlin-test-junit5`.
 
-### Health check
+### Health checks
 
 ```bash
-curl http://localhost:8080/healthz   # OK
+curl http://localhost:8080/healthz   # OK (liveness)
+curl http://localhost:8080/readyz    # READY once Telegram is connected, else 503
 ```
+
+`/healthz` only proves the process is up, so a Telegram outage does not cause a
+restart loop. `/readyz` reports whether the bot is connected; the state is set by the
+startup `getMe()` and refreshed every 60 seconds.
 
 ## Project layout
 
@@ -152,12 +157,13 @@ src/main/kotlin/com/el_giancar/
 │   ├── GameService.kt                 # shared round resolution
 │   ├── ClassicGameService.kt          # classic rules
 │   ├── SheldonGameService.kt          # 5-move rules
-│   └── ChatLocks.kt                   # one mutex per chat
+│   ├── ChatLocks.kt                   # one mutex per chat
+│   └── ReadinessState.kt              # Telegram connectivity for /readyz
 └── infrastructure/
     ├── http/
-    │   └── HealthRoutes.kt            # GET /healthz
+    │   └── HealthRoutes.kt            # GET /healthz + /readyz
     └── telegram/
-        ├── TelegramBot.kt             # command wiring
+        ├── TelegramBot.kt             # command wiring + readiness monitor
         ├── GameFlow.kt                # prompt, timeout, lock, result
         ├── MoveParser.kt              # text -> move
         ├── Replies.kt                 # shared reply helpers
@@ -165,11 +171,11 @@ src/main/kotlin/com/el_giancar/
         └── Messages.kt                # user-facing text
 src/main/resources/
 ├── logback.xml
-└── openapi/documentation.yaml         # documents /healthz
+└── openapi/documentation.yaml         # documents /healthz and /readyz
 src/test/kotlin/com/el_giancar/
 ├── application/                       # game-rule tests
 ├── config/                            # environment config tests
-├── infrastructure/http/               # /healthz route test
+├── infrastructure/http/               # /healthz and /readyz route tests
 ├── infrastructure/logging/            # log redaction + JUL bridge tests
 └── infrastructure/telegram/           # message + move parser tests
 ```
@@ -209,12 +215,12 @@ GitHub secrets/variables, and the token-rotation runbook are documented in
 The service stays on Render's **free** plan. Free web services stop after 15 minutes
 without inbound traffic, which would also stop Telegram long polling, so
 [`.github/workflows/keepalive.yml`](.github/workflows/keepalive.yml) pings
-`/healthz` every 5 minutes. One always-on free service uses under the monthly
+`/readyz` every 5 minutes. One always-on free service uses under the monthly
 instance-hour allowance. GitHub can delay scheduled runs, so a message sent right
 after a rare sleep may wait until the next successful ping; Telegram keeps updates
 for 24 hours, so nothing is lost.
 
-Update `HEALTHCHECK_URL` in that workflow if the Render URL changes (for example in
+Update `READINESS_URL` in that workflow if the Render URL changes (for example in
 a fork).
 
 ## Documentation for contributors and AI agents

@@ -2,6 +2,7 @@ package com.el_giancar
 
 import com.el_giancar.application.ChatLocks
 import com.el_giancar.application.ClassicGameService
+import com.el_giancar.application.ReadinessState
 import com.el_giancar.application.SheldonGameService
 import com.el_giancar.config.AppConfig
 import com.el_giancar.infrastructure.http.healthRoutes
@@ -17,12 +18,13 @@ fun main() {
     installJulToSlf4jBridge()
 
     val config = AppConfig.fromEnvironment()
+    val readiness = ReadinessState()
 
     // Start the HTTP server first so /healthz is reachable while the bot runs.
     // The Telegram long-polling loop then owns the main thread; if it fails, the
     // process exits and the server is stopped.
     val server = embeddedServer(Netty, port = config.port, host = "0.0.0.0") {
-        healthRoutes()
+        healthRoutes(readiness)
     }
     server.start(wait = false)
 
@@ -33,6 +35,7 @@ fun main() {
                 classicGame = ClassicGameService(),
                 sheldonGame = SheldonGameService(),
                 chatLocks = ChatLocks(),
+                readiness = readiness,
             )
         }
     } finally {
