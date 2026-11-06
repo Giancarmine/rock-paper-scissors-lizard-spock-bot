@@ -22,10 +22,11 @@ class JulBridgeTest {
         val root = context.getLogger(ROOT_LOGGER_NAME)
         root.level = Level.INFO
 
-        val appender = ListAppender<ILoggingEvent>().apply {
-            this.context = context
-            start()
-        }
+        val appender =
+            ListAppender<ILoggingEvent>().apply {
+                this.context = context
+                start()
+            }
         root.addAppender(appender)
 
         val token = "123456789:AAExampleTokenValueUsedOnlyForThisTest"
@@ -40,8 +41,9 @@ class JulBridgeTest {
         val event = appender.list.last { it.formattedMessage.contains("/getUpdates") }
 
         @Suppress("UNCHECKED_CAST")
-        val encoder = (root.getAppender("STDOUT") as ConsoleAppender<ILoggingEvent>)
-            .encoder as PatternLayoutEncoder
+        val encoder =
+            (root.getAppender("STDOUT") as ConsoleAppender<ILoggingEvent>)
+                .encoder as PatternLayoutEncoder
         val output = String(encoder.encode(event), Charsets.UTF_8)
 
         assertFalse(output.contains(token), "The token leaked into the log output: $output")

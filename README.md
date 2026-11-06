@@ -77,6 +77,7 @@ Spock vaporizes Rock
 - Gradle 9.8.2 (wrapper committed)
 - Logback 1.6.6
 - JUnit 5 (Jupiter)
+- ktlint via the Gradle plugin 14.2.0
 - Docker (multi-stage, JDK 21)
 
 ## Getting started
@@ -140,6 +141,16 @@ tests, `GameFlow` tests for valid moves, retries, cancellation, timeout and a bu
 chat, idle-text hint tests, HTTP route tests for `/healthz`, `/readyz` and
 `/openapi.yaml`, and log-redaction/timeout-filter tests. Tests run on JUnit 5 via
 `kotlin-test-junit5`.
+
+### Lint
+
+```bash
+./gradlew ktlintCheck   # fail on style violations
+./gradlew ktlintFormat  # apply the safe fixes
+```
+
+`.editorconfig` disables only `standard:package-name`, because `com.el_giancar` is
+intentional.
 
 ### Health checks
 

@@ -10,51 +10,55 @@ import kotlin.test.assertEquals
 
 class HealthRouteTest {
     @Test
-    fun `healthz responds with OK`() = testApplication {
-        application {
-            healthRoutes(ReadinessState())
+    fun `healthz responds with OK`() =
+        testApplication {
+            application {
+                healthRoutes(ReadinessState())
+            }
+
+            val response = client.get("/healthz")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("OK", response.bodyAsText())
         }
-
-        val response = client.get("/healthz")
-
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals("OK", response.bodyAsText())
-    }
 
     @Test
-    fun `readyz responds with 503 before the bot is connected`() = testApplication {
-        application {
-            healthRoutes(ReadinessState())
+    fun `readyz responds with 503 before the bot is connected`() =
+        testApplication {
+            application {
+                healthRoutes(ReadinessState())
+            }
+
+            val response = client.get("/readyz")
+
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertEquals("NOT READY", response.bodyAsText())
         }
-
-        val response = client.get("/readyz")
-
-        assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
-        assertEquals("NOT READY", response.bodyAsText())
-    }
 
     @Test
-    fun `readyz responds with 200 once the bot is connected`() = testApplication {
-        application {
-            healthRoutes(ReadinessState().apply { markReady() })
+    fun `readyz responds with 200 once the bot is connected`() =
+        testApplication {
+            application {
+                healthRoutes(ReadinessState().apply { markReady() })
+            }
+
+            val response = client.get("/readyz")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("READY", response.bodyAsText())
         }
-
-        val response = client.get("/readyz")
-
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals("READY", response.bodyAsText())
-    }
 
     @Test
-    fun `readyz returns to 503 when the connection is lost`() = testApplication {
-        val readiness = ReadinessState().apply { markReady() }
-        application {
-            healthRoutes(readiness)
+    fun `readyz returns to 503 when the connection is lost`() =
+        testApplication {
+            val readiness = ReadinessState().apply { markReady() }
+            application {
+                healthRoutes(readiness)
+            }
+
+            readiness.markNotReady()
+            val response = client.get("/readyz")
+
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
         }
-
-        readiness.markNotReady()
-        val response = client.get("/readyz")
-
-        assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
-    }
 }

@@ -13,11 +13,12 @@ class ClassicGameServiceTest {
 
     @Test
     fun `resolves every classic combination`() {
-        val wins = mapOf(
-            ClassicMoveType.ROCK to setOf(ClassicMoveType.SCISSORS),
-            ClassicMoveType.PAPER to setOf(ClassicMoveType.ROCK),
-            ClassicMoveType.SCISSORS to setOf(ClassicMoveType.PAPER)
-        )
+        val wins =
+            mapOf(
+                ClassicMoveType.ROCK to setOf(ClassicMoveType.SCISSORS),
+                ClassicMoveType.PAPER to setOf(ClassicMoveType.ROCK),
+                ClassicMoveType.SCISSORS to setOf(ClassicMoveType.PAPER),
+            )
 
         for (player in ClassicMoveType.entries) {
             for (bot in ClassicMoveType.entries) {

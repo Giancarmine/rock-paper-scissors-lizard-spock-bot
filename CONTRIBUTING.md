@@ -53,11 +53,14 @@ required. Explain *why* in the body when the change is not obvious.
 Run these before opening a pull request:
 
 ```bash
-./gradlew test buildFatJar
+./gradlew ktlintCheck test buildFatJar
 ```
 
 - **Tests.** New behaviour needs a test. The suite covers both game modes, parsing,
   message formatting, chat locks, `GameFlow`, the HTTP routes, and log redaction.
+- **Formatting.** `./gradlew ktlintFormat` fixes most style issues automatically.
+  `.editorconfig` disables `standard:package-name` because the public package name
+  intentionally contains an underscore.
 - **Docker.** Change the `Dockerfile` only if you can build the image locally:
   `docker build -t rpsls-bot .`
 - **Workflows.** If you edit `.github/workflows`, run `actionlint`.

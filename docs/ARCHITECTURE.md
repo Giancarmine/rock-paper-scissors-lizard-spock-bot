@@ -47,7 +47,7 @@ description).
 | Tests | `src/test/kotlin/com/el_giancar/{application,config}/*Test.kt`, `infrastructure/{http,telegram,logging}/` | Exhaustive pair tables, canonical phrases, message formatting, move parsing, environment parsing, health/readiness/OpenAPI routes, log redaction, the idle-timeout filter, chat-lock eviction, the full `GameFlow` prompt loop through a fake `GameIo`, and the idle-text hint rules. |
 | Logging | `src/main/resources/logback.xml`, `infrastructure/logging/JulBridge.kt`, `ExpectedLongPollTimeoutFilter.kt` | Console appender at `info`, token redaction, a JUL-to-SLF4J bridge so tgbotapi logs use the same pattern, and a filter for the expected idle `getUpdates` timeout. |
 | API spec | `src/main/resources/openapi/documentation.yaml` | Description of `/healthz`, `/readyz`, and `/openapi.yaml`; served by `OpenApiRoutes.kt`. |
-| CI | `.github/workflows/ci.yml` | Builds and tests on push/PR. |
+| CI | `.github/workflows/ci.yml` | Runs ktlint, builds, and tests on push/PR. |
 | Deploy | `.github/workflows/deploy-render.yml` | Updates `BOT_TOKEN` on Render and triggers a deploy. |
 
 ## Startup sequence

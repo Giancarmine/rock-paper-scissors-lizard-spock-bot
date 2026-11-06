@@ -14,7 +14,10 @@ import kotlinx.coroutines.flow.first
  * unit-tested with plain strings.
  */
 internal interface GameIo {
-    suspend fun send(text: String, keyboard: KeyboardMarkup?)
+    suspend fun send(
+        text: String,
+        keyboard: KeyboardMarkup?,
+    )
 
     /** Waits for the next text message from the same chat and returns its text. */
     suspend fun awaitText(): String
@@ -24,10 +27,16 @@ internal class TelegramGameIo(
     private val context: BehaviourContext,
     private val message: TextMessage,
 ) : GameIo {
-    override suspend fun send(text: String, keyboard: KeyboardMarkup?) {
+    override suspend fun send(
+        text: String,
+        keyboard: KeyboardMarkup?,
+    ) {
         context.replyTo(message, text, keyboard)
     }
 
     override suspend fun awaitText(): String =
-        context.waitTextMessage().first { it.chat.id == message.chat.id }.content.text
+        context
+            .waitTextMessage()
+            .first { it.chat.id == message.chat.id }
+            .content.text
 }

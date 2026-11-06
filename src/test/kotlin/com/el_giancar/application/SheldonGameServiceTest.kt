@@ -13,13 +13,14 @@ class SheldonGameServiceTest {
 
     @Test
     fun `resolves every Sheldon combination`() {
-        val wins = mapOf(
-            SheldonMoveType.ROCK to setOf(SheldonMoveType.SCISSORS, SheldonMoveType.LIZARD),
-            SheldonMoveType.PAPER to setOf(SheldonMoveType.ROCK, SheldonMoveType.SPOCK),
-            SheldonMoveType.SCISSORS to setOf(SheldonMoveType.PAPER, SheldonMoveType.LIZARD),
-            SheldonMoveType.LIZARD to setOf(SheldonMoveType.PAPER, SheldonMoveType.SPOCK),
-            SheldonMoveType.SPOCK to setOf(SheldonMoveType.ROCK, SheldonMoveType.SCISSORS)
-        )
+        val wins =
+            mapOf(
+                SheldonMoveType.ROCK to setOf(SheldonMoveType.SCISSORS, SheldonMoveType.LIZARD),
+                SheldonMoveType.PAPER to setOf(SheldonMoveType.ROCK, SheldonMoveType.SPOCK),
+                SheldonMoveType.SCISSORS to setOf(SheldonMoveType.PAPER, SheldonMoveType.LIZARD),
+                SheldonMoveType.LIZARD to setOf(SheldonMoveType.PAPER, SheldonMoveType.SPOCK),
+                SheldonMoveType.SPOCK to setOf(SheldonMoveType.ROCK, SheldonMoveType.SCISSORS),
+            )
 
         for (player in SheldonMoveType.entries) {
             for (bot in SheldonMoveType.entries) {

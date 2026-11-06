@@ -29,6 +29,7 @@ is both a changelog of the review and a list of what still needs owner action.
 | 20 | UX | Plain text sent outside a game was ignored, so a new user could think the bot was broken | Added an `onText` hint for idle private chats. It skips commands, chats where a game holds the lock (the prompt loop owns that text), and group chats so ordinary conversation is not interrupted. |
 | 21 | Packaging / discoverability | There was no license and the OpenAPI document was only readable from the source tree | Added the MIT `LICENSE` and `GET /openapi.yaml`, which serves the bundled spec with `application/yaml`. `OpenApiRouteTest` covers the status, content type, and body. |
 | 22 | Observability | An idle bot logged an expected `HttpRequestTimeoutException` at ERROR every ~30 seconds, burying real failures | Added `ExpectedLongPollTimeoutFilter`, which drops only timeouts whose URL targets `getUpdates`. Other timeouts and errors still reach the appenders; `ExpectedLongPollTimeoutFilterTest` covers direct, wrapped, and unrelated exceptions. |
+| 23 | Tooling | Kotlin formatting was enforced only by convention, so style drift could land unnoticed | Adopted the ktlint Gradle plugin 14.2.0, added `ktlintCheck` to CI, disabled only `standard:package-name` for the intentional `com.el_giancar` underscore, and applied the formatter to the existing sources. |
 
 ## Security status
 
@@ -79,7 +80,9 @@ for the rotation runbook.
 - The logback configuration is tested with a fake bot token in a message and a stack
   trace; the output contains `bot<redacted>` and not the token. The timeout filter is
   tested with direct, wrapped, and unrelated exceptions.
-- Render deploy `dep-dbm7vl942hec73dtvg3g` (commit `a93437c`) reached **Live** and
-  `/healthz` returned `200 OK`; later commits followed the same deploy check.
+- Render deploy `dep-dbmkhubm8hqs73ansl0g` (commit `e6a8a47`) reached **Live** at
+  03:29 UTC. `/healthz` returned `200 OK`, `/readyz` returned `200 READY`,
+  `/openapi.yaml` returned `200 application/yaml`, and the idle logs stayed free of
+  `HttpRequestTimeoutException` and raw tokens.
 - Runtime smoke test of the Telegram path requires a valid token and was not
   performed.

@@ -9,5 +9,8 @@ import com.el_giancar.domain.Move
 interface GameRules<M : Move> {
     val moves: List<M>
 
-    fun phrase(winner: M, loser: M): String?
+    fun phrase(
+        winner: M,
+        loser: M,
+    ): String?
 }

@@ -24,10 +24,11 @@ fun main() {
     // Start the HTTP server first so /healthz is reachable while the bot runs.
     // The Telegram long-polling loop then owns the main thread; if it fails, the
     // process exits and the server is stopped.
-    val server = embeddedServer(Netty, port = config.port, host = "0.0.0.0") {
-        healthRoutes(readiness)
-        openApiRoutes()
-    }
+    val server =
+        embeddedServer(Netty, port = config.port, host = "0.0.0.0") {
+            healthRoutes(readiness)
+            openApiRoutes()
+        }
     server.start(wait = false)
 
     try {

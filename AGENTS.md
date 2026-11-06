@@ -13,7 +13,7 @@ working in this repository. Read this before changing code.
 - **Frameworks:** Ktor 3.6.1 (Netty server), [`dev.inmo:tgbotapi`](https://github.com/InsanusMokrassar/TelegramBotAPI) 37.1.0
   for Telegram, Logback 1.6.6 for logging.
 - **Build:** Gradle 9.8.2 via the committed wrapper (`./gradlew`), with dependency
-  versions in `gradle/libs.versions.toml`.
+  versions in `gradle/libs.versions.toml`. ktlint 14.2.0 enforces Kotlin formatting.
 - **Size:** 25 Kotlin source files, 13 test files, GitHub Actions CI, no persistence.
 - **Deployment:** single Docker image on **Render** (Docker web service, health check
   `/healthz`). The bot uses Telegram **long polling**, so no webhook is required.
@@ -65,6 +65,8 @@ export BOT_TOKEN="<your-token>"
 
 ./gradlew build          # compile + assemble + run tests
 ./gradlew test           # unit tests only
+./gradlew ktlintCheck    # Kotlin formatting check
+./gradlew ktlintFormat   # fix formatting automatically
 ./gradlew run            # starts the bot (long polling) and Ktor on :8080
 ./gradlew buildFatJar    # build/libs/rock-paper-scissors-lizard-spock-bot-all.jar
 java -jar build/libs/rock-paper-scissors-lizard-spock-bot-all.jar
@@ -145,7 +147,7 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/main/resources/logback.xml` | Console logging at `info`, bot-token redaction, and the idle-timeout filter. |
 | `src/main/resources/openapi/documentation.yaml` | Documents `/healthz`, `/readyz`, and `/openapi.yaml`; served by `OpenApiRoutes.kt`. |
 | `Dockerfile`, `.dockerignore` | Two-stage JDK 21 build, fat jar runtime. |
-| `.github/workflows/ci.yml` | CI: `./gradlew build buildFatJar` on Temurin 21. |
+| `.github/workflows/ci.yml` | CI: `./gradlew ktlintCheck` and `./gradlew build buildFatJar` on Temurin 21. |
 | `.github/workflows/deploy-render.yml` | Updates `BOT_TOKEN` on Render and triggers a deploy. |
 | `.github/workflows/keepalive.yml` | Pings `/readyz` every 5 minutes so the free Render service stays awake, and fails if the Telegram connection is dead. |
 | `docs/DEPLOYMENT.md` | Render setup, secrets, and token-rotation runbook. |
@@ -216,6 +218,9 @@ derived by looking up the pair in the opposite order.
 - Move enums use `UPPER_SNAKE_CASE` and set a human-readable `displayName`; reply
   buttons use `displayName`.
 - Kotlin official style, 4-space indentation, LF line endings (see `.editorconfig`).
+  Run `./gradlew ktlintCheck` before committing; `.editorconfig` disables only
+  `standard:package-name` because the package name intentionally contains an
+  underscore.
 - Keep dependency versions in `gradle/libs.versions.toml`; avoid hardcoding versions in
   `build.gradle.kts`.
 - Prefer additive, focused changes. Do not reformat or rename unrelated code in a
@@ -322,6 +327,7 @@ See `docs/DEPLOYMENT.md` for the full rotation runbook and the deploy checks.
 
 Before declaring a change done:
 
+- [ ] `./gradlew ktlintCheck` passes.
 - [ ] `./gradlew build` and `./gradlew test` pass (or explain why they could not run).
 - [ ] `grep -RIn "api.telegram.org/bot"` / token patterns finds nothing new.
 - [ ] New command/move appears in the keyboard, help text, rules, and docs.
