@@ -6,6 +6,7 @@ import com.el_giancar.domain.RoundResult
 import com.el_giancar.domain.SheldonMoveType
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MessagesTest {
@@ -76,12 +77,52 @@ class MessagesTest {
     fun `lists every legal move in the prompt and in the invalid-move hint`() {
         val moves = SheldonMoveType.entries
         val prompt = movePrompt(moves)
-        val hint = unknownMoveMessage(moves, "banana")
+        val hint = unknownMoveMessage(moves, "banana", attemptsLeft = 2)
 
         for (move in moves) {
             assertTrue(prompt.contains(move.displayName), "Prompt is missing ${move.displayName}: $prompt")
             assertTrue(hint.contains(move.displayName), "Hint is missing ${move.displayName}: $hint")
         }
+    }
+
+    @Test
+    fun `truncates a long invalid move and reports the remaining tries`() {
+        val hint = unknownMoveMessage(ClassicMoveType.entries, "x".repeat(50), attemptsLeft = 2)
+
+        assertTrue(hint.contains("\"${"x".repeat(32)}…\""), hint)
+        assertTrue(hint.contains("You have 2 tries left."), hint)
+        assertFalse(hint.contains("x".repeat(33)), hint)
+    }
+
+    @Test
+    fun `uses singular wording for the last try`() {
+        val hint = unknownMoveMessage(ClassicMoveType.entries, "banana", attemptsLeft = 1)
+
+        assertTrue(hint.contains("You have 1 try left."), hint)
+    }
+
+    @Test
+    fun `help lists every command`() {
+        val commands =
+            listOf(
+                "/start",
+                "/classic_game",
+                "/sheldon_game",
+                "/cancel",
+                "/rules",
+                "/commands",
+                "/about",
+                "/help",
+            )
+
+        for (command in commands) {
+            assertTrue(helpMessage.contains(command), "Help is missing $command: $helpMessage")
+        }
+    }
+
+    @Test
+    fun `about mentions the license`() {
+        assertTrue(aboutMessage.contains("MIT"), aboutMessage)
     }
 
     @Test

@@ -76,7 +76,7 @@ internal class GameFlow(
     ): MoveAttempt<M> {
         var prompt = movePrompt(moves)
 
-        repeat(maxMoveAttempts) {
+        repeat(maxMoveAttempts) { attempt ->
             io.send(prompt, movesKeyboard(moves))
 
             val input = io.awaitText().trim()
@@ -90,7 +90,10 @@ internal class GameFlow(
                 return MoveAttempt(MoveAttemptStatus.SELECTED, move)
             }
 
-            prompt = unknownMoveMessage(moves, input)
+            val attemptsLeft = maxMoveAttempts - attempt - 1
+            if (attemptsLeft > 0) {
+                prompt = unknownMoveMessage(moves, input, attemptsLeft)
+            }
         }
 
         return MoveAttempt(MoveAttemptStatus.TOO_MANY_ATTEMPTS)

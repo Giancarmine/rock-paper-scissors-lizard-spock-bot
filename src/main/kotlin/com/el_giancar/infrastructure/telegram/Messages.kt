@@ -8,7 +8,9 @@ internal val startMessage =
     """
     |👋 Welcome to Rock–Paper–Scissors–Lizard–Spock!
     |
-    |Pick a game below, or use /help to see everything I can do.
+    |I pick a random move, you pick yours, and I explain the result.
+    |
+    |Pick a game below, or send /help for the full command list.
     """.trimMargin()
 
 internal val rulesMessage =
@@ -33,15 +35,16 @@ internal val helpMessage =
     """
     |🤖 Commands
     |
-    |/classic_game — Rock, Paper, Scissors
-    |/sheldon_game — Rock, Paper, Scissors, Lizard, Spock
+    |/start — show the welcome message
+    |/classic_game — play Rock, Paper, Scissors
+    |/sheldon_game — play Rock, Paper, Scissors, Lizard, Spock
     |/cancel — cancel the current game
-    |/rules — show the winning moves
+    |/rules — show which move beats which
     |/commands — show the command keyboard
-    |/about — about this bot
+    |/about — show info and source code
     |/help — show this message
     |
-    |During a game, send /cancel (or any other command) to cancel it.
+    |During a game, send /cancel or any other command to end it.
     """.trimMargin()
 
 internal val aboutMessage =
@@ -49,31 +52,31 @@ internal val aboutMessage =
     |🖖 I'm a small open-source Telegram bot for Rock–Paper–Scissors and
     |Rock–Paper–Scissors–Lizard–Spock.
     |
-    |Built with Kotlin, Ktor and tgbotapi.
+    |Built with Kotlin, Ktor and tgbotapi, and released under the MIT license.
     |Source: https://github.com/Giancarmine/rock-paper-scissors-lizard-spock-bot
     """.trimMargin()
 
-internal val commandsMenuMessage = "🎮 Choose a game or a command:"
+internal val commandsMenuMessage = "🎮 Pick a game or a command:"
 
 internal val busyMessage =
-    "⏳ A game is already in progress in this chat. Finish it, or send any command to cancel it."
+    "⏳ A game is already running in this chat. Play your move, or send /cancel to end it."
 
 internal val cancelledMessage = "🚫 Game cancelled. Start a new one whenever you're ready."
 
 internal val noActiveGameMessage =
-    "🤔 There's no game in progress in this chat. Start one with /classic_game or /sheldon_game."
+    "🤔 No game is running right now. Start one with /classic_game or /sheldon_game."
 
 internal val idleTextMessage =
-    "🎮 I only play games here. Start one with /classic_game or /sheldon_game, " +
-        "or use /commands to see everything I can do."
+    "🎮 I can't chat, but I can play! Start a game with /classic_game or " +
+        "/sheldon_game, or send /commands to see everything I can do."
 
 internal val timeoutMessage = "⌛ This game timed out. Start a new one whenever you're ready."
 
 internal val tooManyAttemptsMessage =
-    "❌ Too many invalid moves — game cancelled. Start a new one whenever you're ready."
+    "❌ Too many invalid moves, so I cancelled the game. Start a new one whenever you're ready."
 
 internal val unknownCommandMessage =
-    "🤔 I don't know that command. Use /commands to see what I can do."
+    "🤔 I don't know that command. Send /commands to see what I can do."
 
 internal fun movePrompt(moves: List<Move>): String =
     """
@@ -86,9 +89,17 @@ internal fun movePrompt(moves: List<Move>): String =
 internal fun unknownMoveMessage(
     moves: List<Move>,
     input: String,
-): String =
-    "🤔 \"${input.take(32)}\" isn't a valid move. Choose one of: " +
-        moves.joinToString(", ") { it.displayName } + "."
+    attemptsLeft: Int,
+): String {
+    val shown =
+        input.trim().replace(Regex("\\s+"), " ").let {
+            if (it.length > 32) it.take(32) + "…" else it
+        }
+    val tries = if (attemptsLeft == 1) "1 try" else "$attemptsLeft tries"
+    return "🤔 \"$shown\" isn't a valid move. Choose one of: " +
+        moves.joinToString(", ") { it.displayName } + ".\n" +
+        "You have $tries left."
+}
 
 internal fun resultMessage(result: RoundResult<*>): String =
     buildString {

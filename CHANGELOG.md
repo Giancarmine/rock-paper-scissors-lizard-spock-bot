@@ -25,6 +25,8 @@ in `build.gradle.kts` is the source of truth for releases.
 - Documented the OpenAPI route in `docs/ARCHITECTURE.md` and `AGENTS.md`.
 - Corrected the documented HTTP surface, JUnit version, and timeout-filter guidance in
   the README and deployment runbook.
+- Refined the bot's user-facing texts: clearer prompts and errors, consistent command
+  descriptions, retry counts on invalid moves, and a license note in `/about`.
 - Applied ktlint formatting across the Kotlin sources.
 
 ### Security
