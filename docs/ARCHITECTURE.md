@@ -97,7 +97,7 @@ sequenceDiagram
     TG-->>B: update (long polling)
     B->>L: tryLock(chatId)
     alt chat is busy
-        B->>TG: "A game is already in progress..."
+        B->>TG: "A game is already running..."
     else lock acquired
         B->>TG: "Your move!" + reply keyboard
         U->>TG: spock (lowercase is accepted)

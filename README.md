@@ -38,7 +38,7 @@ Docker image.
 | `/sheldon_game` | Play with Rock, Paper, Scissors, Lizard, Spock. |
 | `/cancel` | Cancel the current game (or report that none is running). |
 | `/help` | List the available commands. |
-| `/about` | About the bot and its source. |
+| `/about` | About the bot, its source, and its license. |
 | `/commands` | Show the command keyboard. |
 | anything else | Replies with a hint to use `/commands`. |
 

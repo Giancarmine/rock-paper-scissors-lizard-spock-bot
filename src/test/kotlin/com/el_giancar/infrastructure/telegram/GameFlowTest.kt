@@ -41,6 +41,7 @@ class GameFlowTest {
 
             assertEquals(3, io.sent.size)
             assertTrue(io.sent[1].contains("banana"), io.sent[1])
+            assertTrue(io.sent[1].contains("You have 2 tries left."), io.sent[1])
             assertTrue(io.sent[2].startsWith("You: Paper"), io.sent[2])
         }
 
