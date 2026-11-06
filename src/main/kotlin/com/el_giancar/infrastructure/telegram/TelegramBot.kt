@@ -11,7 +11,9 @@ import dev.inmo.tgbotapi.extensions.api.bot.getMe
 import dev.inmo.tgbotapi.extensions.api.telegramBot
 import dev.inmo.tgbotapi.extensions.behaviour_builder.buildBehaviourWithLongPolling
 import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onCommand
+import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onText
 import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onUnhandledCommand
+import dev.inmo.tgbotapi.types.chat.PrivateChat
 import dev.inmo.tgbotapi.utils.PreviewFeature
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancelAndJoin
@@ -107,6 +109,22 @@ suspend fun runTelegramBot(
                     }
                 }
 
+                onText { message ->
+                    // Commands belong to the command handlers, and plain text sent
+                    // during a game belongs to the GameFlow prompt loop (which
+                    // re-prompts on an invalid move). Only nudge in an idle private
+                    // chat, so a group conversation is never interrupted.
+                    if (
+                        shouldHintOnIdleText(
+                            text = message.content.text,
+                            chatIsBusy = chatLocks.isBusy(message.chat.id.chatId.long),
+                            chatIsPrivate = message.chat is PrivateChat,
+                        )
+                    ) {
+                        replyTo(message, idleTextMessage, commandsKeyboard())
+                    }
+                }
+
                 onUnhandledCommand { message ->
                     replyTo(message, unknownCommandMessage, unhandledCommandKeyboard())
                 }
@@ -117,3 +135,19 @@ suspend fun runTelegramBot(
         }
     }
 }
+
+/**
+ * Whether an incoming text message should receive the idle hint.
+ *
+ * Commands are handled elsewhere, plain text during a game is the prompt loop's job,
+ * and a group chat should not get a reply to every message.
+ */
+internal fun shouldHintOnIdleText(
+    text: String,
+    chatIsBusy: Boolean,
+    chatIsPrivate: Boolean,
+): Boolean =
+    chatIsPrivate &&
+        !chatIsBusy &&
+        text.isNotBlank() &&
+        !text.trimStart().startsWith("/")

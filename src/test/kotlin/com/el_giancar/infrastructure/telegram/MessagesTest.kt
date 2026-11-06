@@ -94,4 +94,11 @@ class MessagesTest {
         assertTrue(noActiveGameMessage.contains("/classic_game"))
         assertTrue(noActiveGameMessage.contains("/sheldon_game"))
     }
+
+    @Test
+    fun `points idle text at the game commands and the command list`() {
+        assertTrue(idleTextMessage.contains("/classic_game"), idleTextMessage)
+        assertTrue(idleTextMessage.contains("/sheldon_game"), idleTextMessage)
+        assertTrue(idleTextMessage.contains("/commands"), idleTextMessage)
+    }
 }

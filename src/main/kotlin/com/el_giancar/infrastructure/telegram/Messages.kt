@@ -59,6 +59,10 @@ internal val cancelledMessage = "🚫 Game cancelled. Start a new one whenever y
 internal val noActiveGameMessage =
     "🤔 There's no game in progress in this chat. Start one with /classic_game or /sheldon_game."
 
+internal val idleTextMessage =
+    "🎮 I only play games here. Start one with /classic_game or /sheldon_game, " +
+        "or use /commands to see everything I can do."
+
 internal val timeoutMessage = "⌛ This game timed out. Start a new one whenever you're ready."
 
 internal val tooManyAttemptsMessage =
