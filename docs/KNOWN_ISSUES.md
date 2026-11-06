@@ -73,20 +73,20 @@ for the rotation runbook.
   canonical phrase checks, exact message formatting, move parsing, chat-lock eviction,
   the `GameFlow` prompt loop, and `testApplication` checks for `GET /healthz`, both
   states of `GET /readyz`, and `GET /openapi.yaml`.
-- `./gradlew clean test buildFatJar` passes with Temurin JDK 21 (48 tests); the fat
+- `./gradlew clean test buildFatJar` passes with Temurin JDK 21 (52 tests); the fat
   jar starts and fails fast with a clear message when `BOT_TOKEN` is missing.
 - The `/healthz`, `/readyz`, and `/openapi.yaml` routes were smoke-tested against a
   running fat jar and against the deployed Render service.
 - The logback configuration is tested with a fake bot token in a message and a stack
   trace; the output contains `bot<redacted>` and not the token. The timeout filter is
   tested with direct, wrapped, and unrelated exceptions.
-- Render deploy `dep-dbmks32jnfac73apcbm0` (commit `8c984f4`) reached **Live** at
-  03:50 UTC. `/healthz` returned `200 OK`, `/readyz` returned `200 READY`,
-  `/openapi.yaml` returned `200 application/yaml`, and the idle logs stayed free of
-  `HttpRequestTimeoutException` and raw tokens. The earlier
-  `dep-dbmkhubm8hqs73ansl0g` deploy was verified the same way.
-- The running image corresponds to `8c984f4`; commits after it are documentation-only
-  updates (including the deploy record), so no redeploy is required for them.
+- Render deploy `dep-dbms4i15efls738f61d0` (commit `a27ab46`, the text refinements)
+  reached **Live** at 12:06 UTC. `/healthz` returned `200 OK`, `/readyz` returned
+  `200 READY`, `/openapi.yaml` returned `200 application/yaml`, and the logs showed the
+  Telegram connection without raw tokens. The earlier `dep-dbmks32jnfac73apcbm0`
+  deploy (commit `8c984f4`) was verified the same way.
+- The running image corresponds to `a27ab46`; later commits are documentation-only
+  updates, so no redeploy is required for them.
 - Runtime verification of the Telegram path: the Render logs show
   `Connected to Telegram as @RockPaperScissorsLizardSpockBot`, and `/readyz` returned
   `READY`. An interactive `/start` exchange still requires the owner's Telegram
