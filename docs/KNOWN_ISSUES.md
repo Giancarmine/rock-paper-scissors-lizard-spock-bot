@@ -24,6 +24,7 @@ is both a changelog of the review and a list of what still needs owner action.
 | 14 | UX / Architecture | User-facing prose lived in the game services, move labels were enum names, `TelegramBot` mixed wiring/parsing/flow, and an abandoned game locked the chat forever | Services return typed `RoundResult`; `Messages.kt` renders all text; moves have `displayName`; `GameFlow` + `MoveParser` split the adapter; games time out after two minutes. |
 | 16 | Observability | `/healthz` only proved the HTTP server was up, so a dead Telegram session or revoked token still looked healthy | Added `/readyz`: `200` when connected, `503` otherwise. Readiness is set by the startup `getMe()` and refreshed by a 60-second `getMe()` monitor. `/healthz` stays a liveness probe so a Telegram outage does not cause a restart loop. |
 | 17 | UX | `/cancel` was not registered, so outside a game it fell through to the generic "use /commands" reply | Registered `/cancel`, added it to the move keyboard and help text. During a game the prompt loop sends the cancellation reply; when idle the handler explains that no game is running. |
+| 18 | Memory | The per-chat mutex map was never evicted | `ChatLocks` now pins entries with a reference count and evicts them through `ConcurrentHashMap.compute` when the last caller releases an unlocked lock. Pinning prevents two callers from acquiring different mutexes for the same chat. |
 
 ## Still requires owner action
 
@@ -77,8 +78,9 @@ without explicit approval and coordination with everyone who has a clone.
   GitHub can delay scheduled runs. Updates remain queued in Telegram for 24 hours.
 - **Readiness lags a real outage by up to 60 seconds.** The periodic `getMe()` check
   runs every 60 seconds; `/readyz` does not call Telegram on each request.
-- **The per-chat mutex map is never evicted.** Entries are small, but the map grows
-  with the number of distinct chats seen since startup.
+- **The per-chat mutex map is bounded by active chats.** Entries are reference-counted
+  and evicted when the last caller releases an unlocked lock; an idle chat does not
+  keep an entry.
 
 ## Verification performed
 

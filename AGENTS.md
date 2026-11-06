@@ -118,7 +118,7 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/main/kotlin/com/el_giancar/application/GameService.kt` | Shared random move + win/lose/tie resolution; returns `RoundResult`. |
 | `src/main/kotlin/com/el_giancar/application/ClassicGameService.kt` | Binds `GameService` to the classic rule set. |
 | `src/main/kotlin/com/el_giancar/application/SheldonGameService.kt` | Binds `GameService` to the 5-move rule set. |
-| `src/main/kotlin/com/el_giancar/application/ChatLocks.kt` | One coroutine `Mutex` per numeric chat id. |
+| `src/main/kotlin/com/el_giancar/application/ChatLocks.kt` | Reference-counted per-chat `Mutex`; entries are evicted when the last caller releases an unlocked lock. |
 | `src/main/kotlin/com/el_giancar/application/ReadinessState.kt` | Thread-safe flag for Telegram connectivity, updated by the bot and read by `/readyz`. |
 | `src/main/kotlin/com/el_giancar/infrastructure/http/HealthRoutes.kt` | `GET /healthz` (liveness) and `GET /readyz` (Telegram readiness) routes. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Bot wiring: commands, long polling, and the 60-second readiness monitor. |
@@ -212,9 +212,10 @@ derived by looking up the pair in the opposite order.
 
 ## Known pitfalls
 
-- Games time out after **two minutes** (`GameFlow.gameTimeout`). The mutex is released
-  in a `finally` block, so a timed-out game cannot stay locked. If you change the
-  timeout, keep that structure.
+- Games time out after **two minutes** (`GameFlow.gameTimeout`). The lock is released
+  in a `finally` block via `ChatLock.release()`, which also drops the pin, so a
+  timed-out game cannot stay locked or leak a map entry. If you change the timeout,
+  keep that structure and always call `release()` exactly once per `acquire()`.
 - `waitTextMessage()` expects the update flow of the command's subcontext. Command
   handlers already filter by chat (`MessageFilterByChat`); the explicit chat-id check
   is a second safety net. Do not remove either without evaluating concurrency.
@@ -223,7 +224,7 @@ derived by looking up the pair in the opposite order.
   handler deliberately stays silent while `ChatLocks.isBusy(chatId)` is true; the
   prompt loop sends the single cancellation reply. Without that guard the user gets
   two messages.
-- `ChatIdentifier`/`ChatId` is a value class; the mutex map is keyed by the underlying
+- `ChatIdentifier`/`ChatId` is a value class; the lock map is keyed by the underlying
   `Long` (`message.chat.id.chatId.long`).
 - Input is matched against `displayName`, not the enum `name`. Adding a move without
   setting `displayName` (and without listing it in `/rules`) makes it invisible in
