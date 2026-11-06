@@ -18,101 +18,112 @@ class GameFlowTest {
     private val game = FixedClassicGame()
 
     @Test
-    fun `plays a valid move and sends the prompt and the result`() = runBlocking {
-        val io = FakeGameIo("  rOcK ")
+    fun `plays a valid move and sends the prompt and the result`() =
+        runBlocking {
+            val io = FakeGameIo("  rOcK ")
 
-        GameFlow(ChatLocks()).play(chatId = 1L, game = game, io = io)
+            GameFlow(ChatLocks()).play(chatId = 1L, game = game, io = io)
 
-        assertEquals(2, io.sent.size)
-        assertTrue(io.sent[0].contains("Your move!"), io.sent[0])
-        assertEquals(
-            resultMessage(RoundResult(ClassicMoveType.ROCK, ClassicMoveType.SCISSORS, GameOutcome.WIN, "Rock crushes Scissors")),
-            io.sent[1],
-        )
-    }
-
-    @Test
-    fun `re-prompts after an invalid move and accepts the next one`() = runBlocking {
-        val io = FakeGameIo("banana", "Paper")
-
-        GameFlow(ChatLocks()).play(chatId = 1L, game = game, io = io)
-
-        assertEquals(3, io.sent.size)
-        assertTrue(io.sent[1].contains("banana"), io.sent[1])
-        assertTrue(io.sent[2].startsWith("You: Paper"), io.sent[2])
-    }
-
-    @Test
-    fun `cancels after too many invalid attempts`() = runBlocking {
-        val io = FakeGameIo("one", "two", "three")
-
-        GameFlow(ChatLocks()).play(chatId = 1L, game = game, io = io)
-
-        assertEquals(4, io.sent.size)
-        assertEquals(tooManyAttemptsMessage, io.sent.last())
-    }
-
-    @Test
-    fun `cancels when the player sends a command`() = runBlocking {
-        val io = FakeGameIo("/cancel")
-
-        GameFlow(ChatLocks()).play(chatId = 1L, game = game, io = io)
-
-        assertEquals(2, io.sent.size)
-        assertEquals(cancelledMessage, io.sent[1])
-    }
-
-    @Test
-    fun `times out and releases the chat lock`() = runBlocking {
-        val chatLocks = ChatLocks()
-        val io = FakeGameIo()
-
-        GameFlow(chatLocks, gameTimeout = 50.milliseconds)
-            .play(chatId = 1L, game = game, io = io)
-
-        assertEquals(timeoutMessage, io.sent.last())
-        assertFalse(chatLocks.isBusy(1L))
-        assertEquals(0, chatLocks.trackedChats())
-    }
-
-    @Test
-    fun `rejects a second game in the same chat while the first is running`() = runBlocking {
-        val chatLocks = ChatLocks()
-        val holder = chatLocks.acquire(1L)
-        assertTrue(holder.tryLock())
-
-        try {
-            val io = FakeGameIo("Rock")
-            GameFlow(chatLocks).play(chatId = 1L, game = game, io = io)
-
-            assertEquals(listOf(busyMessage), io.sent)
-        } finally {
-            holder.release()
+            assertEquals(2, io.sent.size)
+            assertTrue(io.sent[0].contains("Your move!"), io.sent[0])
+            assertEquals(
+                resultMessage(RoundResult(ClassicMoveType.ROCK, ClassicMoveType.SCISSORS, GameOutcome.WIN, "Rock crushes Scissors")),
+                io.sent[1],
+            )
         }
 
-        assertFalse(chatLocks.isBusy(1L))
-    }
+    @Test
+    fun `re-prompts after an invalid move and accepts the next one`() =
+        runBlocking {
+            val io = FakeGameIo("banana", "Paper")
+
+            GameFlow(ChatLocks()).play(chatId = 1L, game = game, io = io)
+
+            assertEquals(3, io.sent.size)
+            assertTrue(io.sent[1].contains("banana"), io.sent[1])
+            assertTrue(io.sent[2].startsWith("You: Paper"), io.sent[2])
+        }
 
     @Test
-    fun `releases the chat lock after a normal game`() = runBlocking {
-        val chatLocks = ChatLocks()
+    fun `cancels after too many invalid attempts`() =
+        runBlocking {
+            val io = FakeGameIo("one", "two", "three")
 
-        GameFlow(chatLocks).play(chatId = 9L, game = game, io = FakeGameIo("Rock"))
+            GameFlow(ChatLocks()).play(chatId = 1L, game = game, io = io)
 
-        assertFalse(chatLocks.isBusy(9L))
-    }
+            assertEquals(4, io.sent.size)
+            assertEquals(tooManyAttemptsMessage, io.sent.last())
+        }
+
+    @Test
+    fun `cancels when the player sends a command`() =
+        runBlocking {
+            val io = FakeGameIo("/cancel")
+
+            GameFlow(ChatLocks()).play(chatId = 1L, game = game, io = io)
+
+            assertEquals(2, io.sent.size)
+            assertEquals(cancelledMessage, io.sent[1])
+        }
+
+    @Test
+    fun `times out and releases the chat lock`() =
+        runBlocking {
+            val chatLocks = ChatLocks()
+            val io = FakeGameIo()
+
+            GameFlow(chatLocks, gameTimeout = 50.milliseconds)
+                .play(chatId = 1L, game = game, io = io)
+
+            assertEquals(timeoutMessage, io.sent.last())
+            assertFalse(chatLocks.isBusy(1L))
+            assertEquals(0, chatLocks.trackedChats())
+        }
+
+    @Test
+    fun `rejects a second game in the same chat while the first is running`() =
+        runBlocking {
+            val chatLocks = ChatLocks()
+            val holder = chatLocks.acquire(1L)
+            assertTrue(holder.tryLock())
+
+            try {
+                val io = FakeGameIo("Rock")
+                GameFlow(chatLocks).play(chatId = 1L, game = game, io = io)
+
+                assertEquals(listOf(busyMessage), io.sent)
+            } finally {
+                holder.release()
+            }
+
+            assertFalse(chatLocks.isBusy(1L))
+        }
+
+    @Test
+    fun `releases the chat lock after a normal game`() =
+        runBlocking {
+            val chatLocks = ChatLocks()
+
+            GameFlow(chatLocks).play(chatId = 9L, game = game, io = FakeGameIo("Rock"))
+
+            assertFalse(chatLocks.isBusy(9L))
+        }
 }
 
-private class FakeGameIo(vararg inputs: String) : GameIo {
+private class FakeGameIo(
+    vararg inputs: String,
+) : GameIo {
     private val pending = ArrayDeque(inputs.toList())
     val sent = mutableListOf<String>()
 
-    override suspend fun send(text: String, keyboard: KeyboardMarkup?) {
+    override suspend fun send(
+        text: String,
+        keyboard: KeyboardMarkup?,
+    ) {
         sent += text
     }
 
-    override suspend fun awaitText(): String =
-        pending.removeFirstOrNull() ?: awaitCancellation()
+    override suspend fun awaitText(): String = pending.removeFirstOrNull() ?: awaitCancellation()
 }
 
 private class FixedClassicGame : Game<ClassicMoveType> {

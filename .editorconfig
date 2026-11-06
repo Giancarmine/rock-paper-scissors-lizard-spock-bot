@@ -9,6 +9,8 @@ indent_style = space
 
 [*.{kt,kts}]
 indent_size = 4
+# The public package name intentionally keeps the owner's underscore.
+ktlint_standard_package-name = disabled
 
 [*.{yml,yaml,json}]
 indent_size = 2

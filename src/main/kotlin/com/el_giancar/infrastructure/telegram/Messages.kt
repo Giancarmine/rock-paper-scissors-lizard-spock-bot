@@ -4,13 +4,15 @@ import com.el_giancar.domain.GameOutcome
 import com.el_giancar.domain.Move
 import com.el_giancar.domain.RoundResult
 
-internal val startMessage = """
+internal val startMessage =
+    """
     |👋 Welcome to Rock–Paper–Scissors–Lizard–Spock!
     |
     |Pick a game below, or use /help to see everything I can do.
-""".trimMargin()
+    """.trimMargin()
 
-internal val rulesMessage = """
+internal val rulesMessage =
+    """
     |🧠 Rock–Paper–Scissors–Lizard–Spock
     |
     |✂️ Scissors cuts Paper 📄
@@ -25,9 +27,10 @@ internal val rulesMessage = """
     |🪨 Rock crushes Scissors ✂️
     |
     |Classic mode uses only Rock, Paper and Scissors.
-""".trimMargin()
+    """.trimMargin()
 
-internal val helpMessage = """
+internal val helpMessage =
+    """
     |🤖 Commands
     |
     |/classic_game — Rock, Paper, Scissors
@@ -39,15 +42,16 @@ internal val helpMessage = """
     |/help — show this message
     |
     |During a game, send /cancel (or any other command) to cancel it.
-""".trimMargin()
+    """.trimMargin()
 
-internal val aboutMessage = """
+internal val aboutMessage =
+    """
     |🖖 I'm a small open-source Telegram bot for Rock–Paper–Scissors and
     |Rock–Paper–Scissors–Lizard–Spock.
     |
     |Built with Kotlin, Ktor and tgbotapi.
     |Source: https://github.com/Giancarmine/rock-paper-scissors-lizard-spock-bot
-""".trimMargin()
+    """.trimMargin()
 
 internal val commandsMenuMessage = "🎮 Choose a game or a command:"
 
@@ -71,23 +75,28 @@ internal val tooManyAttemptsMessage =
 internal val unknownCommandMessage =
     "🤔 I don't know that command. Use /commands to see what I can do."
 
-internal fun movePrompt(moves: List<Move>): String = """
+internal fun movePrompt(moves: List<Move>): String =
+    """
     |🎮 Your move!
     |
     |Tap a button below or type one of: ${moves.joinToString(", ") { it.displayName }}.
     |Send /cancel (or any other command) to cancel the game.
-""".trimMargin()
+    """.trimMargin()
 
-internal fun unknownMoveMessage(moves: List<Move>, input: String): String =
+internal fun unknownMoveMessage(
+    moves: List<Move>,
+    input: String,
+): String =
     "🤔 \"${input.take(32)}\" isn't a valid move. Choose one of: " +
         moves.joinToString(", ") { it.displayName } + "."
 
-internal fun resultMessage(result: RoundResult<*>): String = buildString {
-    append("You: ").append(result.playerMove.displayName).append('\n')
-    append("Me: ").append(result.botMove.displayName).append("\n\n")
-    when (result.outcome) {
-        GameOutcome.WIN -> append("🎉 You win! ").append(requireNotNull(result.rulePhrase)).append('.')
-        GameOutcome.LOSE -> append("😅 I win this round! ").append(requireNotNull(result.rulePhrase)).append('.')
-        GameOutcome.TIE -> append("🤝 It's a tie!")
+internal fun resultMessage(result: RoundResult<*>): String =
+    buildString {
+        append("You: ").append(result.playerMove.displayName).append('\n')
+        append("Me: ").append(result.botMove.displayName).append("\n\n")
+        when (result.outcome) {
+            GameOutcome.WIN -> append("🎉 You win! ").append(requireNotNull(result.rulePhrase)).append('.')
+            GameOutcome.LOSE -> append("😅 I win this round! ").append(requireNotNull(result.rulePhrase)).append('.')
+            GameOutcome.TIE -> append("🤝 It's a tie!")
+        }
     }
-}

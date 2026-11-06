@@ -8,7 +8,7 @@
 
 ## Verification
 
-- [ ] `./gradlew test buildFatJar`
+- [ ] `./gradlew ktlintCheck test buildFatJar`
 - [ ] Tested the relevant path locally (`/healthz`, `/readyz`, `/openapi.yaml`, or a
       Telegram command)
 - [ ] `actionlint` passes for workflow changes

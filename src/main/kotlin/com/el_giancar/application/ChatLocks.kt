@@ -27,9 +27,10 @@ class ChatLocks {
      * once when done, whether or not [ChatLock.tryLock] succeeded.
      */
     fun acquire(chatId: Long): ChatLock {
-        val entry = entries.compute(chatId) { _, existing ->
-            (existing ?: Entry()).also { it.users++ }
-        }!!
+        val entry =
+            entries.compute(chatId) { _, existing ->
+                (existing ?: Entry()).also { it.users++ }
+            }!!
         return ChatLock(chatId, entry)
     }
 

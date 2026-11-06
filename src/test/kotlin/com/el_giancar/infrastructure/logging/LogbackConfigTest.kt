@@ -24,20 +24,22 @@ class LogbackConfigTest {
             configurator.doConfigure(config)
 
             val root = context.getLogger(Logger.ROOT_LOGGER_NAME)
+
             @Suppress("UNCHECKED_CAST")
             val appender = root.getAppender("STDOUT") as ConsoleAppender<ILoggingEvent>
             val encoder = appender.encoder as PatternLayoutEncoder
 
             val token = "123456789:AAExampleTokenValueUsedOnlyForThisTest"
             val url = "https://api.telegram.org/bot$token/getUpdates"
-            val event = LoggingEvent(
-                LogbackConfigTest::class.java.name,
-                context.getLogger("KTgBot"),
-                Level.ERROR,
-                "Call failed: $url",
-                IllegalStateException("Request failed: $url"),
-                null
-            )
+            val event =
+                LoggingEvent(
+                    LogbackConfigTest::class.java.name,
+                    context.getLogger("KTgBot"),
+                    Level.ERROR,
+                    "Call failed: $url",
+                    IllegalStateException("Request failed: $url"),
+                    null,
+                )
 
             val output = String(encoder.encode(event), Charsets.UTF_8)
 

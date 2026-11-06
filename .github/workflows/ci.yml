@@ -22,5 +22,8 @@ jobs:
           java-version: "21"
           cache: gradle
 
+      - name: Lint Kotlin
+        run: ./gradlew ktlintCheck --no-daemon
+
       - name: Build, test and package
         run: ./gradlew build buildFatJar --no-daemon

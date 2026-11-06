@@ -12,12 +12,13 @@ data class AppConfig(
 ) {
     companion object {
         fun fromEnvironment(environment: Map<String, String> = System.getenv()): AppConfig {
-            val botToken = environment["BOT_TOKEN"]
-                ?.takeIf { it.isNotBlank() }
-                ?: error(
-                    "BOT_TOKEN is not set. Create a bot with @BotFather and export the token " +
-                        "before starting the application."
-                )
+            val botToken =
+                environment["BOT_TOKEN"]
+                    ?.takeIf { it.isNotBlank() }
+                    ?: error(
+                        "BOT_TOKEN is not set. Create a bot with @BotFather and export the token " +
+                            "before starting the application.",
+                    )
             val port = environment["PORT"]?.toIntOrNull() ?: 8080
 
             return AppConfig(botToken = botToken, port = port)

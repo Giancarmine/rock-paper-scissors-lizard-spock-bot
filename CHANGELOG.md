@@ -17,11 +17,13 @@ in `build.gradle.kts` is the source of truth for releases.
   an idle bot while keeping real errors.
 - Dependabot configuration for Gradle, GitHub Actions, and Docker base images.
 - Contributor and security guides, issue and pull-request templates, and a changelog.
+- ktlint formatting checks in CI (Gradle plugin 14.2.0).
 
 ### Changed
 
 - Expanded the README badges, project layout, and known-limitations section.
 - Documented the OpenAPI route in `docs/ARCHITECTURE.md` and `AGENTS.md`.
+- Applied ktlint formatting across the Kotlin sources.
 
 ### Security
 

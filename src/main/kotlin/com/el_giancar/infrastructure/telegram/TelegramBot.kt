@@ -42,93 +42,96 @@ suspend fun runTelegramBot(
         // A long-polling bot can stay up while its Telegram session is dead (for
         // example after the token is revoked). Probe the API so /readyz reflects
         // that instead of only proving the HTTP server is alive.
-        val connectionMonitor = launch {
-            delay(connectionCheckInterval)
-            while (isActive) {
-                val connected = try {
-                    bot.getMe()
-                    true
-                } catch (exception: CancellationException) {
-                    throw exception
-                } catch (exception: Exception) {
-                    false
-                }
-
-                if (connected) {
-                    readiness.markReady()
-                } else {
-                    readiness.markNotReady()
-                    logger.warn("Telegram readiness check failed; /readyz will report NOT READY")
-                }
-
+        val connectionMonitor =
+            launch {
                 delay(connectionCheckInterval)
+                while (isActive) {
+                    val connected =
+                        try {
+                            bot.getMe()
+                            true
+                        } catch (exception: CancellationException) {
+                            throw exception
+                        } catch (exception: Exception) {
+                            false
+                        }
+
+                    if (connected) {
+                        readiness.markReady()
+                    } else {
+                        readiness.markNotReady()
+                        logger.warn("Telegram readiness check failed; /readyz will report NOT READY")
+                    }
+
+                    delay(connectionCheckInterval)
+                }
             }
-        }
 
         try {
-            bot.buildBehaviourWithLongPolling {
-                val me = bot.getMe()
-                readiness.markReady()
-                logger.info("Connected to Telegram as {}", me.username)
+            bot
+                .buildBehaviourWithLongPolling {
+                    val me = bot.getMe()
+                    readiness.markReady()
+                    logger.info("Connected to Telegram as {}", me.username)
 
-                onCommand("start") { message ->
-                    replyTo(message, startMessage, commandsKeyboard())
-                }
-
-                onCommand("rules") { message ->
-                    replyTo(message, rulesMessage, commandsKeyboard())
-                }
-
-                onCommand("help") { message ->
-                    replyTo(message, helpMessage, commandsKeyboard())
-                }
-
-                onCommand("about") { message ->
-                    replyTo(message, aboutMessage, commandsKeyboard())
-                }
-
-                onCommand("classic_game") { message ->
-                    gameFlow.play(this, message, classicGame)
-                }
-
-                onCommand("sheldon_game") { message ->
-                    gameFlow.play(this, message, sheldonGame)
-                }
-
-                onCommand("commands") { message ->
-                    replyTo(message, commandsMenuMessage, commandsKeyboard())
-                }
-
-                onCommand("cancel") { message ->
-                    // While a game is running, GameFlow receives the same text message
-                    // and replies with cancelledMessage; replying here too would send
-                    // two messages. Outside a game, explain that there is nothing to
-                    // cancel instead of falling through to the unknown-command hint.
-                    if (!chatLocks.isBusy(message.chat.id.chatId.long)) {
-                        replyTo(message, noActiveGameMessage, commandsKeyboard())
+                    onCommand("start") { message ->
+                        replyTo(message, startMessage, commandsKeyboard())
                     }
-                }
 
-                onText { message ->
-                    // Commands belong to the command handlers, and plain text sent
-                    // during a game belongs to the GameFlow prompt loop (which
-                    // re-prompts on an invalid move). Only nudge in an idle private
-                    // chat, so a group conversation is never interrupted.
-                    if (
-                        shouldHintOnIdleText(
-                            text = message.content.text,
-                            chatIsBusy = chatLocks.isBusy(message.chat.id.chatId.long),
-                            chatIsPrivate = message.chat is PrivateChat,
-                        )
-                    ) {
-                        replyTo(message, idleTextMessage, commandsKeyboard())
+                    onCommand("rules") { message ->
+                        replyTo(message, rulesMessage, commandsKeyboard())
                     }
-                }
 
-                onUnhandledCommand { message ->
-                    replyTo(message, unknownCommandMessage, unhandledCommandKeyboard())
-                }
-            }.join()
+                    onCommand("help") { message ->
+                        replyTo(message, helpMessage, commandsKeyboard())
+                    }
+
+                    onCommand("about") { message ->
+                        replyTo(message, aboutMessage, commandsKeyboard())
+                    }
+
+                    onCommand("classic_game") { message ->
+                        gameFlow.play(this, message, classicGame)
+                    }
+
+                    onCommand("sheldon_game") { message ->
+                        gameFlow.play(this, message, sheldonGame)
+                    }
+
+                    onCommand("commands") { message ->
+                        replyTo(message, commandsMenuMessage, commandsKeyboard())
+                    }
+
+                    onCommand("cancel") { message ->
+                        // While a game is running, GameFlow receives the same text message
+                        // and replies with cancelledMessage; replying here too would send
+                        // two messages. Outside a game, explain that there is nothing to
+                        // cancel instead of falling through to the unknown-command hint.
+                        if (!chatLocks.isBusy(message.chat.id.chatId.long)) {
+                            replyTo(message, noActiveGameMessage, commandsKeyboard())
+                        }
+                    }
+
+                    onText { message ->
+                        // Commands belong to the command handlers, and plain text sent
+                        // during a game belongs to the GameFlow prompt loop (which
+                        // re-prompts on an invalid move). Only nudge in an idle private
+                        // chat, so a group conversation is never interrupted.
+                        if (
+                            shouldHintOnIdleText(
+                                text = message.content.text,
+                                chatIsBusy = chatLocks.isBusy(message.chat.id.chatId.long),
+                                chatIsPrivate = message.chat is PrivateChat,
+                            )
+                        ) {
+                            replyTo(message, idleTextMessage, commandsKeyboard())
+                        }
+                    }
+
+                    onUnhandledCommand { message ->
+                        replyTo(message, unknownCommandMessage, unhandledCommandKeyboard())
+                    }
+                }.join()
         } finally {
             readiness.markNotReady()
             connectionMonitor.cancelAndJoin()

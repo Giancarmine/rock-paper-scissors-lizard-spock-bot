@@ -49,9 +49,10 @@ internal class GameFlow(
         }
 
         try {
-            val attempt = withTimeoutOrNull(gameTimeout) {
-                awaitMove(game.moves, io)
-            }
+            val attempt =
+                withTimeoutOrNull(gameTimeout) {
+                    awaitMove(game.moves, io)
+                }
 
             when {
                 attempt == null -> io.send(timeoutMessage, commandsKeyboard())

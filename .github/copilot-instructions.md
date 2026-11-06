@@ -23,7 +23,8 @@ Key points:
 - HTTP routes live in `infrastructure/http/`: `/healthz`, `/readyz`, and the
   bundled `/openapi.yaml`.
 - Add tests under `src/test/kotlin` and run `./gradlew test`.
-- Prefer focused changes; do not reformat unrelated code.
+- Prefer focused changes; do not reformat unrelated code unless the PR is explicitly
+  about formatting.
 
 Details: [`AGENTS.md`](../AGENTS.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md),
 [`SECURITY.md`](../SECURITY.md), [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md),

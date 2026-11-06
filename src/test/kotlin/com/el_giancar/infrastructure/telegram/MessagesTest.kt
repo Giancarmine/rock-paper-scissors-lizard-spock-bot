@@ -11,14 +11,15 @@ import kotlin.test.assertTrue
 class MessagesTest {
     @Test
     fun `shows both moves and the winning phrase`() {
-        val message = resultMessage(
-            RoundResult(
-                playerMove = ClassicMoveType.ROCK,
-                botMove = ClassicMoveType.SCISSORS,
-                outcome = GameOutcome.WIN,
-                rulePhrase = "Rock crushes Scissors",
+        val message =
+            resultMessage(
+                RoundResult(
+                    playerMove = ClassicMoveType.ROCK,
+                    botMove = ClassicMoveType.SCISSORS,
+                    outcome = GameOutcome.WIN,
+                    rulePhrase = "Rock crushes Scissors",
+                ),
             )
-        )
 
         assertEquals(
             """
@@ -33,14 +34,15 @@ class MessagesTest {
 
     @Test
     fun `formats a loss from the player's point of view`() {
-        val message = resultMessage(
-            RoundResult(
-                playerMove = ClassicMoveType.ROCK,
-                botMove = ClassicMoveType.PAPER,
-                outcome = GameOutcome.LOSE,
-                rulePhrase = "Paper covers Rock",
+        val message =
+            resultMessage(
+                RoundResult(
+                    playerMove = ClassicMoveType.ROCK,
+                    botMove = ClassicMoveType.PAPER,
+                    outcome = GameOutcome.LOSE,
+                    rulePhrase = "Paper covers Rock",
+                ),
             )
-        )
 
         assertTrue(message.contains("You: Rock"))
         assertTrue(message.contains("Me: Paper"))
@@ -49,14 +51,15 @@ class MessagesTest {
 
     @Test
     fun `formats a tie without a winning phrase`() {
-        val message = resultMessage(
-            RoundResult(
-                playerMove = ClassicMoveType.SCISSORS,
-                botMove = ClassicMoveType.SCISSORS,
-                outcome = GameOutcome.TIE,
-                rulePhrase = null,
+        val message =
+            resultMessage(
+                RoundResult(
+                    playerMove = ClassicMoveType.SCISSORS,
+                    botMove = ClassicMoveType.SCISSORS,
+                    outcome = GameOutcome.TIE,
+                    rulePhrase = null,
+                ),
             )
-        )
 
         assertEquals(
             """
