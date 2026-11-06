@@ -159,7 +159,7 @@ src/main/kotlin/com/el_giancar/
 │   ├── GameService.kt                 # shared round resolution
 │   ├── ClassicGameService.kt          # classic rules
 │   ├── SheldonGameService.kt          # 5-move rules
-│   ├── ChatLocks.kt                   # one mutex per chat
+│   ├── ChatLocks.kt                   # per-chat mutex, evicted when idle
 │   └── ReadinessState.kt              # Telegram connectivity for /readyz
 └── infrastructure/
     ├── http/

@@ -38,7 +38,7 @@ provides `PORT`, default 8080) and serves only `GET /healthz` (liveness) and
 | Round domain | `src/main/kotlin/com/el_giancar/domain/GameOutcome.kt`, `RoundResult.kt` | Typed outcome (`WIN`/`LOSE`/`TIE`) and the resolved round data. |
 | Game application | `src/main/kotlin/com/el_giancar/application/Game.kt`, `GameRules.kt`, `GameService.kt` | Variant contract, legal moves + winning phrases, and shared round resolution. Stateless and Telegram-free. |
 | Game variants | `src/main/kotlin/com/el_giancar/application/ClassicGameService.kt`, `SheldonGameService.kt` | The 3-move and 5-move rule sets; thin subclasses of `GameService`. |
-| Chat locks | `src/main/kotlin/com/el_giancar/application/ChatLocks.kt` | One `Mutex` per numeric chat id, keeping the application layer Telegram-free. |
+| Chat locks | `src/main/kotlin/com/el_giancar/application/ChatLocks.kt` | Reference-counted per-chat `Mutex`; idle entries are evicted after release. Keeps the application layer Telegram-free. |
 | Readiness | `src/main/kotlin/com/el_giancar/application/ReadinessState.kt` | Thread-safe connectivity flag shared by the Telegram adapter and `/readyz`. |
 | Tests | `src/test/kotlin/com/el_giancar/{application,config}/*Test.kt`, `infrastructure/{http,telegram}/` | Exhaustive pair tables, canonical phrases, message formatting, move parsing, environment parsing, the health/readiness routes, and log redaction. |
 | Logging | `src/main/resources/logback.xml`, `infrastructure/logging/JulBridge.kt` | Console appender at `info`, token redaction, and a JUL-to-SLF4J bridge so tgbotapi logs use the same pattern. |

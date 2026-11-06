@@ -26,8 +26,9 @@ internal class GameFlow(
         message: TextMessage,
         game: Game<M>,
     ) {
-        val lock = chatLocks.forChat(message.chat.id.chatId.long)
-        if (!lock.tryLock()) {
+        val chatLock = chatLocks.acquire(message.chat.id.chatId.long)
+        if (!chatLock.tryLock()) {
+            chatLock.release()
             context.replyTo(message, busyMessage)
             return
         }
@@ -49,7 +50,7 @@ internal class GameFlow(
                 }
             }
         } finally {
-            lock.unlock()
+            chatLock.release()
         }
     }
 
