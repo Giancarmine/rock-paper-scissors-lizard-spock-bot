@@ -76,7 +76,7 @@ Spock vaporizes Rock
 - tgbotapi 37.1.0 (`dev.inmo`)
 - Gradle 9.8.2 (wrapper committed)
 - Logback 1.6.6
-- JUnit 5 (Jupiter)
+- JUnit 6 (Jupiter)
 - ktlint via the Gradle plugin 14.2.0
 - Docker (multi-stage, JDK 21)
 
@@ -98,9 +98,10 @@ export BOT_TOKEN="<your-token>"
 export PORT=8080          # optional
 ```
 
-> `BOT_TOKEN` is required at runtime. `.env` is git-ignored; never commit a real
-> token. Production tokens live only in GitHub Actions secrets and the hosting
-> platform, never in the repository.
+> `BOT_TOKEN` is required at runtime. The application reads the process environment;
+> it does not load `.env` automatically, so export the variables before running. `.env`
+> is git-ignored; never commit a real token. Production tokens live only in GitHub
+> Actions secrets and the hosting platform, never in the repository.
 
 ### Run locally
 
@@ -108,8 +109,8 @@ export PORT=8080          # optional
 ./gradlew run
 ```
 
-The process starts Ktor on `0.0.0.0:8080` (only `/healthz` and `/readyz` are
-exposed) and then begins Telegram long polling. Send `/start` to your bot.
+The process starts Ktor on `0.0.0.0:8080` and exposes only `/healthz`, `/readyz`,
+and `/openapi.yaml`; then it begins Telegram long polling. Send `/start` to your bot.
 
 ### Build a jar
 
@@ -139,8 +140,8 @@ image.
 canonical winning phrases, formatting tests for the user-facing messages, move parser
 tests, `GameFlow` tests for valid moves, retries, cancellation, timeout and a busy
 chat, idle-text hint tests, HTTP route tests for `/healthz`, `/readyz` and
-`/openapi.yaml`, and log-redaction/timeout-filter tests. Tests run on JUnit 5 via
-`kotlin-test-junit5`.
+`/openapi.yaml`, and log-redaction/timeout-filter tests. Tests run on the JUnit
+Platform (Jupiter 6) via `kotlin-test-junit5` and the JUnit BOM.
 
 ### Lint
 
@@ -203,7 +204,7 @@ src/main/kotlin/com/el_giancar/
         └── Messages.kt                # user-facing text
 src/main/resources/
 ├── logback.xml
-└── openapi/documentation.yaml         # documents /healthz and /readyz
+└── openapi/documentation.yaml         # documents /healthz, /readyz, /openapi.yaml
 src/test/kotlin/com/el_giancar/
 ├── application/                       # game-rule tests
 ├── config/                            # environment config tests
@@ -220,7 +221,7 @@ verification that backs each item.
 
 **State and scaling**
 
-- **No persistence.** Games, scores, and chat locks live in memory, so every round is
+- **No persistence or scores.** Games and chat locks live in memory, so every round is
   independent and a restart forgets in-flight games.
 - **One instance per token.** Telegram long polling allows a single consumer; a second
   replica would get `409 Conflict`. Horizontal scaling needs webhooks and a shared

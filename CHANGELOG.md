@@ -23,6 +23,8 @@ in `build.gradle.kts` is the source of truth for releases.
 
 - Expanded the README badges, project layout, and known-limitations section.
 - Documented the OpenAPI route in `docs/ARCHITECTURE.md` and `AGENTS.md`.
+- Corrected the documented HTTP surface, JUnit version, and timeout-filter guidance in
+  the README and deployment runbook.
 - Applied ktlint formatting across the Kotlin sources.
 
 ### Security

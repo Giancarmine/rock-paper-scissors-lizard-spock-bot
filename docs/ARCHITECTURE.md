@@ -219,8 +219,8 @@ Notes:
   coupling to the project version in the file name.
 - The token is injected at runtime as the Render environment variable `BOT_TOKEN`; it
   is never a build argument and is never baked into the image.
-- CI (`.github/workflows/ci.yml`) builds and tests every push/PR. The deploy workflow
-  (`.github/workflows/deploy-render.yml`) runs on `v*` tags or manual dispatch.
+- CI (`.github/workflows/ci.yml`) lints, builds, and tests every push/PR. The deploy
+  workflow (`.github/workflows/deploy-render.yml`) runs on `v*` tags or manual dispatch.
 - Build and runtime both use JDK 21. Render supplies `PORT` and probes `/healthz`.
   The keepalive workflow probes `/readyz` so a disconnected bot is visible.
 - The bot only needs a long-running process and outbound HTTPS to `api.telegram.org`;
