@@ -80,9 +80,10 @@ for the rotation runbook.
 - The logback configuration is tested with a fake bot token in a message and a stack
   trace; the output contains `bot<redacted>` and not the token. The timeout filter is
   tested with direct, wrapped, and unrelated exceptions.
-- Render deploy `dep-dbmkhubm8hqs73ansl0g` (commit `e6a8a47`) reached **Live** at
-  03:29 UTC. `/healthz` returned `200 OK`, `/readyz` returned `200 READY`,
+- Render deploy `dep-dbmks32jnfac73apcbm0` (commit `8c984f4`) reached **Live** at
+  03:50 UTC. `/healthz` returned `200 OK`, `/readyz` returned `200 READY`,
   `/openapi.yaml` returned `200 application/yaml`, and the idle logs stayed free of
-  `HttpRequestTimeoutException` and raw tokens.
+  `HttpRequestTimeoutException` and raw tokens. The earlier
+  `dep-dbmkhubm8hqs73ansl0g` deploy was verified the same way.
 - Runtime smoke test of the Telegram path requires a valid token and was not
   performed.
