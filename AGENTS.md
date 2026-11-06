@@ -19,7 +19,7 @@ working in this repository. Read this before changing code.
   `/healthz`). The bot uses Telegram **long polling**, so no webhook is required.
   `.github/workflows/deploy-render.yml` pushes `secrets.BOT_TOKEN` to Render and
   triggers a deploy. The service stays on the free plan,
-  and `.github/workflows/keepalive.yml` pings `/healthz` every 5 minutes so Render
+  and `.github/workflows/keepalive.yml` pings `/readyz` every 5 minutes so Render
   does not sleep and stop polling.
 
 Repository root is the directory containing this file.
@@ -71,6 +71,7 @@ export BOT_TOKEN="<your-token>"
 java -jar build/libs/rock-paper-scissors-lizard-spock-bot-all.jar
 
 curl http://localhost:8080/healthz   # -> OK
+curl http://localhost:8080/readyz    # -> READY once Telegram is connected
 ```
 
 Docker:
@@ -82,8 +83,8 @@ docker run --rm -p 8080:8080 -e BOT_TOKEN="<your-token>" rpsls-bot
 
 Notes:
 
-- Ktor binds `0.0.0.0:$PORT` (default 8080) and only serves `/healthz`. All real
-  functionality goes through Telegram long polling.
+- Ktor binds `0.0.0.0:$PORT` (default 8080) and serves only `/healthz` and
+  `/readyz`. All real functionality goes through Telegram long polling.
 - The bot does nothing useful without a valid token and outbound HTTPS access to
   `api.telegram.org`.
 
@@ -91,11 +92,11 @@ Notes:
 
 ```text
 Application.kt                        main(): reads config, starts Ktor
-  │                                   (GET /healthz), then runBlocking { runTelegramBot }
+  │                                   (GET /healthz, /readyz), then runBlocking { runTelegramBot }
   ├─ config/AppConfig.kt              BOT_TOKEN / PORT from the environment
-  ├─ infrastructure/http/             GET /healthz route
+  ├─ infrastructure/http/             liveness + readiness routes
   ├─ infrastructure/logging/          JulBridge.kt: JUL -> SLF4J so redaction applies
-  └─ infrastructure/telegram/         TelegramBot.kt: command wiring + long polling
+  └─ infrastructure/telegram/         TelegramBot.kt: command wiring + long polling + readiness monitor
        ├─ GameFlow.kt                 prompt, 2-minute timeout, chat lock
        ├─ MoveParser.kt               text -> move (case-insensitive)
        ├─ Messages.kt / Keyboards.kt  user-facing text and keyboards
@@ -105,7 +106,7 @@ Application.kt                        main(): reads config, starts Ktor
 
 | Path | Responsibility |
 | --- | --- |
-| `src/main/kotlin/com/el_giancar/Application.kt` | Composition root: reads config, starts Ktor with `/healthz`, wires services, then runs Telegram on the main thread. |
+| `src/main/kotlin/com/el_giancar/Application.kt` | Composition root: reads config, starts Ktor with `/healthz` and `/readyz`, wires services, then runs Telegram on the main thread. |
 | `src/main/kotlin/com/el_giancar/config/AppConfig.kt` | Reads `BOT_TOKEN` and `PORT`; fails fast when the token is missing. |
 | `src/main/kotlin/com/el_giancar/domain/Move.kt` | Move contract: human-readable `displayName`. |
 | `src/main/kotlin/com/el_giancar/domain/GameOutcome.kt` | `WIN` / `LOSE` / `TIE` from the player's point of view. |
@@ -118,8 +119,9 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/main/kotlin/com/el_giancar/application/ClassicGameService.kt` | Binds `GameService` to the classic rule set. |
 | `src/main/kotlin/com/el_giancar/application/SheldonGameService.kt` | Binds `GameService` to the 5-move rule set. |
 | `src/main/kotlin/com/el_giancar/application/ChatLocks.kt` | One coroutine `Mutex` per numeric chat id. |
-| `src/main/kotlin/com/el_giancar/infrastructure/http/HealthRoutes.kt` | `GET /healthz` route. |
-| `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Bot wiring: commands and long polling. |
+| `src/main/kotlin/com/el_giancar/application/ReadinessState.kt` | Thread-safe flag for Telegram connectivity, updated by the bot and read by `/readyz`. |
+| `src/main/kotlin/com/el_giancar/infrastructure/http/HealthRoutes.kt` | `GET /healthz` (liveness) and `GET /readyz` (Telegram readiness) routes. |
+| `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Bot wiring: commands, long polling, and the 60-second readiness monitor. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameFlow.kt` | Prompt loop, 2-minute timeout, per-chat lock, result rendering. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/MoveParser.kt` | Case-insensitive text-to-move parsing. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Replies.kt` | Shared reply/menu helpers. |
@@ -127,25 +129,26 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Messages.kt` | All user-facing text and `RoundResult` formatting. |
 | `src/test/kotlin/com/el_giancar/application/*Test.kt` | Exhaustive pair tables for both games and typed results. |
 | `src/test/kotlin/com/el_giancar/config/AppConfigTest.kt` | Environment parsing and fail-fast behavior. |
-| `src/test/kotlin/com/el_giancar/infrastructure/http/HealthRouteTest.kt` | Ktor test for `GET /healthz`. |
+| `src/test/kotlin/com/el_giancar/infrastructure/http/HealthRouteTest.kt` | Ktor tests for `GET /healthz` and `GET /readyz` (ready and not ready). |
 | `src/test/kotlin/com/el_giancar/infrastructure/logging/LogbackConfigTest.kt` | Verifies that bot tokens are redacted from messages and stack traces. |
 | `src/test/kotlin/com/el_giancar/infrastructure/logging/JulBridgeTest.kt` | Verifies that `java.util.logging` records reach Logback and are redacted. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/MoveParserTest.kt` | Case-insensitive parsing and per-game move validation. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/MessagesTest.kt` | Exact win/tie wording, both moves, and prompt contents. |
 | `src/main/resources/logback.xml` | Console logging at `info`, with bot-token redaction. |
-| `src/main/resources/openapi/documentation.yaml` | Documents the `/healthz` endpoint (not served by Ktor). |
+| `src/main/resources/openapi/documentation.yaml` | Documents `/healthz` and `/readyz` (not served by Ktor). |
 | `Dockerfile`, `.dockerignore` | Two-stage JDK 21 build, fat jar runtime. |
 | `.github/workflows/ci.yml` | CI: `./gradlew build buildFatJar` on Temurin 21. |
 | `.github/workflows/deploy-render.yml` | Updates `BOT_TOKEN` on Render and triggers a deploy. |
-| `.github/workflows/keepalive.yml` | Pings `/healthz` every 5 minutes so the free Render service stays awake. |
+| `.github/workflows/keepalive.yml` | Pings `/readyz` every 5 minutes so the free Render service stays awake, and fails if the Telegram connection is dead. |
 | `docs/DEPLOYMENT.md` | Render setup, secrets, and token-rotation runbook. |
 | `build.gradle.kts`, `gradle/libs.versions.toml` | Build logic and dependency versions. |
 
 ### Telegram update flow
 
 1. `main()` builds `AppConfig` from `BOT_TOKEN` (failing fast if absent) and `PORT`,
-   starts Ktor and its `/healthz` route, then calls `runTelegramBot(...)`, which
-   builds the bot and both games and starts `buildBehaviourWithLongPolling`.
+   starts Ktor with `/healthz` and `/readyz`, then calls `runTelegramBot(...)`, which
+   builds the bot, both games, and a readiness monitor, then starts
+   `buildBehaviourWithLongPolling`.
 2. `onCommand("classic_game" | "sheldon_game")` calls `GameFlow.play(...)`, which
    acquires a **per-chat mutex** so two games cannot run in the same chat at once.
    If the chat is busy, the user is told to finish the current game.
@@ -225,7 +228,9 @@ derived by looking up the pair in the opposite order.
   the log redaction pattern or the jul-to-slf4j bridge because that exception message
   contains the token.
 - Render's free plan sleeps after 15 minutes without inbound traffic. The scheduled
-  `keepalive.yml` workflow pings `/healthz`; keep it enabled while on the free plan.
+  `keepalive.yml` workflow pings `/readyz`; keep it enabled while on the free plan.
+  `/healthz` must stay a liveness probe (always 200): pointing it at Telegram state
+  would make the platform restart a process that is merely disconnected.
 - `getNames<T>()` was removed together with string-based parsing. Do not reintroduce
   it unless it has a real caller.
 - The old bot token was removed from all commits, but copies/forks/caches may still
@@ -279,8 +284,8 @@ token.
 2. Store it as the GitHub secret: `gh secret set BOT_TOKEN`.
 3. Run the deploy workflow: `gh workflow run deploy-render.yml`. It updates the
    Render environment variable and redeploys.
-4. Confirm the deploy is live (`render deploys list <srv-id>`) and `/healthz` returns
-   `OK`, then send `/start` to the bot.
+4. Confirm the deploy is live (`render deploys list <srv-id>`), `/healthz` returns
+   `OK`, `/readyz` returns `READY`, then send `/start` to the bot.
 5. Confirm Render logs show `bot<redacted>` and not the token.
 
 See `docs/DEPLOYMENT.md`. History was already purged; do not rewrite it again without

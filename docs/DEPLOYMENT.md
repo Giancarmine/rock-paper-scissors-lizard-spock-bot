@@ -2,7 +2,7 @@
 
 The bot is a long-running process that uses Telegram **long polling**. On Render it
 runs as a Docker web service; Render requires a bound HTTP port, which the bot
-provides with `GET /healthz`.
+provides with `GET /healthz` (liveness) and `GET /readyz` (Telegram connectivity).
 
 ## How deployment works
 
@@ -76,8 +76,10 @@ gh run watch
 
 The service runs on Render's **free** plan. Free web services stop after 15 minutes
 without inbound traffic; outbound long polling alone does not keep them awake. The
-[`Keep alive`](../.github/workflows/keepalive.yml) workflow requests `/healthz` every
-5 minutes so the service stays up and keeps processing Telegram updates.
+[`Keep alive`](../.github/workflows/keepalive.yml) workflow requests `/readyz` every
+5 minutes so the service stays up and keeps processing Telegram updates. Targeting
+readiness (not liveness) means the workflow fails when the process is up but its
+Telegram connection is dead, instead of keeping a useless process alive.
 
 - One always-on free service stays within Render's monthly instance-hour allowance
   (750 hours; a 31-day month is 744 hours). The allowance is shared across the
@@ -90,7 +92,7 @@ without inbound traffic; outbound long polling alone does not keep them awake. T
   is not cut off. Keep the job timeout above the curl budget if you tune either value.
 - `cancel-in-progress` is `false`: a run that is waiting for a sleeping service must
   be allowed to finish, so a newer scheduled run queues instead of cancelling it.
-- Update `HEALTHCHECK_URL` in the workflow if the service URL changes. Remove the
+- Update `READINESS_URL` in the workflow if the service URL changes. Remove the
   workflow after moving to a paid plan that does not sleep.
 - Scheduled workflows are disabled after 60 days without repository activity; a
   regular commit or manual run re-enables them.
@@ -113,7 +115,9 @@ Use this after a leak or a scheduled rotation:
    render deploys list srv-xxxxxxxxxxxxxxxx -o text
    ```
 5. Send `/start` to the bot to verify it responds.
-6. Check `https://<your-service>.onrender.com/healthz` returns `OK`.
+6. Check `https://<your-service>.onrender.com/healthz` returns `OK` and
+   `https://<your-service>.onrender.com/readyz` returns `READY` (503 until the bot
+   has connected to Telegram).
 7. Confirm new Render log lines no longer contain the token. Wait for the next
    `HttpRequestTimeoutException`, then check for `bot<redacted>`. tgbotapi includes
    the request URL (and therefore the token) in error messages, so
@@ -156,6 +160,7 @@ new token is written to the logs again.
 | Workflow fails with HTTP 403 | API key lacks the required scopes. |
 | Deploy stays queued or fails | Check the Render deploy logs; the service may need a plan/region change. |
 | Bot starts but does not answer | The token is invalid/revoked, or the service cannot reach `api.telegram.org`. |
-| Bot does not answer after a quiet period | The free service slept; check the `Keep alive` workflow and wake it with `curl https://<your-service>.onrender.com/healthz`. |
+| Bot does not answer after a quiet period | The free service slept; check the `Keep alive` workflow and wake it with `curl https://<your-service>.onrender.com/readyz`. |
 | Render logs show `HttpRequestTimeoutException` every 30 seconds | tgbotapi's client timeout equals the long-poll timeout while idle. The token is redacted; the bot keeps polling. |
 | `/healthz` returns 404 | The deployed revision predates the health route; redeploy. |
+| `/readyz` returns 503 while `/healthz` returns 200 | The process is up but the Telegram connection failed (revoked token, blocked network, or Telegram outage). Check the startup log and Render logs. The bot re-checks every 60 seconds. |

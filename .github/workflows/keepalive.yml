@@ -4,6 +4,10 @@ name: Keep alive
 # traffic. This scheduled ping keeps the bot awake while staying on the free
 # tier.
 #
+# It targets /readyz, not /healthz, so the workflow fails when the process is
+# up but the Telegram connection is dead (for example a revoked token). That
+# makes a broken bot visible instead of keeping a useless process awake.
+#
 # Budgets must line up so a cold start is not killed halfway:
 #   curl worst case = (retry + 1) * max-time + retry * retry-delay
 #                   = 4 * 120s + 3 * 15s = 525s (8m45s)
@@ -14,7 +18,7 @@ name: Keep alive
 # service to wake up must be allowed to finish. A scheduled run that arrives in
 # the meantime waits (at most one is queued) instead of cancelling the wake-up.
 #
-# Forks and clones: change HEALTHCHECK_URL to your own Render URL (or remove
+# Forks and clones: change READINESS_URL to your own Render URL (or remove
 # this workflow if you do not host the bot on Render's free plan).
 
 on:
@@ -33,9 +37,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Ping the health endpoint
+      - name: Ping the readiness endpoint
         env:
-          HEALTHCHECK_URL: https://rock-paper-scissors-lizard-spock-bot.onrender.com/healthz
+          READINESS_URL: https://rock-paper-scissors-lizard-spock-bot.onrender.com/readyz
         run: |
           set -euo pipefail
           curl --fail --silent --show-error \
@@ -44,5 +48,5 @@ jobs:
             --retry 3 \
             --retry-delay 15 \
             --retry-all-errors \
-            "$HEALTHCHECK_URL"
-          echo "Health check succeeded."
+            "$READINESS_URL"
+          echo "Readiness check succeeded."

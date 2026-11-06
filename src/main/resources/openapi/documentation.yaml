@@ -2,14 +2,16 @@ openapi: "3.0.3"
 info:
   title: "rock-paper-scissors-lizard-spock-bot"
   description: >-
-    Health endpoint of the Telegram bot process. The bot itself communicates
+    Health endpoints of the Telegram bot process. The bot itself communicates
     through Telegram long polling and exposes no other HTTP API.
   version: "1.0.0"
 paths:
   /healthz:
     get:
       summary: Liveness probe
-      description: Returns 200 when the Ktor server is running.
+      description: >-
+        Returns 200 while the Ktor server is running. This intentionally does not
+        depend on Telegram, so a Telegram outage does not trigger restarts.
       responses:
         "200":
           description: "OK"
@@ -20,3 +22,29 @@ paths:
               examples:
                 Example#1:
                   value: "OK"
+  /readyz:
+    get:
+      summary: Readiness probe
+      description: >-
+        Returns 200 when the bot is connected to Telegram and 503 otherwise. The
+        state is set by the first successful getMe() and refreshed by a periodic
+        getMe() check, so a revoked token or a dead session is reported.
+      responses:
+        "200":
+          description: "The bot is connected to Telegram."
+          content:
+            text/plain:
+              schema:
+                type: "string"
+              examples:
+                Example#1:
+                  value: "READY"
+        "503":
+          description: "The bot is not connected to Telegram."
+          content:
+            text/plain:
+              schema:
+                type: "string"
+              examples:
+                Example#1:
+                  value: "NOT READY"
