@@ -3,7 +3,7 @@ WORKDIR /home/gradle/src
 COPY --chown=gradle:gradle . .
 RUN ./gradlew buildFatJar --no-daemon
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 WORKDIR /app
 COPY --from=build /home/gradle/src/build/libs/*-all.jar /app/app.jar
 ENV PORT=8080
