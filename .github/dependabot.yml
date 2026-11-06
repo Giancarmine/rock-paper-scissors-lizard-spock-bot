@@ -34,5 +34,12 @@ updates:
     groups:
       docker-images:
         patterns: ["*"]
+    # The build and runtime are pinned to JDK 21 and Gradle 9.x on purpose.
+    # Major image bumps need a deliberate migration and a full test/deploy cycle.
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "gradle"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
