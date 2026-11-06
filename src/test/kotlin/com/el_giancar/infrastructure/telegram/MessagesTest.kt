@@ -80,4 +80,18 @@ class MessagesTest {
             assertTrue(hint.contains(move.displayName), "Hint is missing ${move.displayName}: $hint")
         }
     }
+
+    @Test
+    fun `advertises the cancel command in help and in the move prompt`() {
+        val prompt = movePrompt(ClassicMoveType.entries)
+
+        assertTrue(helpMessage.contains("/cancel"), "Help is missing /cancel: $helpMessage")
+        assertTrue(prompt.contains("/cancel"), "Prompt is missing /cancel: $prompt")
+    }
+
+    @Test
+    fun `explains that there is nothing to cancel when no game is running`() {
+        assertTrue(noActiveGameMessage.contains("/classic_game"))
+        assertTrue(noActiveGameMessage.contains("/sheldon_game"))
+    }
 }
