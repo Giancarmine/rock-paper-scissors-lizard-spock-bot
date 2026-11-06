@@ -126,8 +126,9 @@ image.
 ```
 
 `src/test/kotlin` contains exhaustive pair tables for both game modes, checks for the
-canonical winning phrases, formatting tests for the user-facing messages, and move
-parser tests. Tests run on JUnit 5 via `kotlin-test-junit5`.
+canonical winning phrases, formatting tests for the user-facing messages, move parser
+tests, and `GameFlow` tests for valid moves, retries, cancellation, timeout and a busy
+chat. Tests run on JUnit 5 via `kotlin-test-junit5`.
 
 ### Health checks
 
@@ -167,6 +168,7 @@ src/main/kotlin/com/el_giancar/
     └── telegram/
         ├── TelegramBot.kt             # command wiring + readiness monitor
         ├── GameFlow.kt                # prompt, timeout, lock, result
+        ├── GameIo.kt                  # send/await seam for flow tests
         ├── MoveParser.kt              # text -> move
         ├── Replies.kt                 # shared reply helpers
         ├── Keyboards.kt               # reply keyboards
@@ -179,7 +181,7 @@ src/test/kotlin/com/el_giancar/
 ├── config/                            # environment config tests
 ├── infrastructure/http/               # /healthz and /readyz route tests
 ├── infrastructure/logging/            # log redaction + JUL bridge tests
-└── infrastructure/telegram/           # message + move parser tests
+└── infrastructure/telegram/           # messages, move parser, GameFlow tests
 ```
 
 ## Known limitations

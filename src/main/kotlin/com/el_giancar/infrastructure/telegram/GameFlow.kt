@@ -4,9 +4,7 @@ import com.el_giancar.application.ChatLocks
 import com.el_giancar.application.Game
 import com.el_giancar.domain.Move
 import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
-import dev.inmo.tgbotapi.extensions.behaviour_builder.expectations.waitTextMessage
 import dev.inmo.tgbotapi.types.message.content.TextMessage
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -15,38 +13,55 @@ import kotlin.time.Duration.Companion.minutes
  * Runs one game turn: acquires the chat lock, asks for a move, applies the rules,
  * and renders the result. Keeping this flow out of the command wiring makes the
  * Telegram adapter easier to read and keeps message formatting in one place.
+ *
+ * Telegram I/O goes through [GameIo], so the loop can be tested without a real bot.
  */
 internal class GameFlow(
     private val chatLocks: ChatLocks,
     private val gameTimeout: Duration = 2.minutes,
     private val maxMoveAttempts: Int = 3,
+    private val ioFor: (BehaviourContext, TextMessage) -> GameIo = { context, message ->
+        TelegramGameIo(context, message)
+    },
 ) {
     suspend fun <M : Move> play(
         context: BehaviourContext,
         message: TextMessage,
         game: Game<M>,
     ) {
-        val chatLock = chatLocks.acquire(message.chat.id.chatId.long)
+        play(
+            chatId = message.chat.id.chatId.long,
+            game = game,
+            io = ioFor(context, message),
+        )
+    }
+
+    internal suspend fun <M : Move> play(
+        chatId: Long,
+        game: Game<M>,
+        io: GameIo,
+    ) {
+        val chatLock = chatLocks.acquire(chatId)
         if (!chatLock.tryLock()) {
             chatLock.release()
-            context.replyTo(message, busyMessage)
+            io.send(busyMessage, keyboard = null)
             return
         }
 
         try {
             val attempt = withTimeoutOrNull(gameTimeout) {
-                context.awaitMove(message, game.moves)
+                awaitMove(game.moves, io)
             }
 
             when {
-                attempt == null -> context.finish(message, timeoutMessage)
+                attempt == null -> io.send(timeoutMessage, commandsKeyboard())
                 attempt.status == MoveAttemptStatus.CANCELLED ->
-                    context.finish(message, cancelledMessage)
+                    io.send(cancelledMessage, commandsKeyboard())
                 attempt.status == MoveAttemptStatus.TOO_MANY_ATTEMPTS ->
-                    context.finish(message, tooManyAttemptsMessage)
+                    io.send(tooManyAttemptsMessage, commandsKeyboard())
                 else -> {
                     val move = requireNotNull(attempt.move) { "A selected attempt must carry a move" }
-                    context.replyTo(message, resultMessage(game.play(move)), commandsKeyboard())
+                    io.send(resultMessage(game.play(move)), commandsKeyboard())
                 }
             }
         } finally {
@@ -54,17 +69,16 @@ internal class GameFlow(
         }
     }
 
-    private suspend fun <M : Move> BehaviourContext.awaitMove(
-        message: TextMessage,
+    private suspend fun <M : Move> awaitMove(
         moves: List<M>,
+        io: GameIo,
     ): MoveAttempt<M> {
         var prompt = movePrompt(moves)
 
         repeat(maxMoveAttempts) {
-            replyTo(message, prompt, movesKeyboard(moves))
+            io.send(prompt, movesKeyboard(moves))
 
-            val playerMessage = waitTextMessage().first { it.chat.id == message.chat.id }
-            val input = playerMessage.content.text.trim()
+            val input = io.awaitText().trim()
 
             if (input.startsWith("/")) {
                 return MoveAttempt(MoveAttemptStatus.CANCELLED)
@@ -79,10 +93,6 @@ internal class GameFlow(
         }
 
         return MoveAttempt(MoveAttemptStatus.TOO_MANY_ATTEMPTS)
-    }
-
-    private suspend fun BehaviourContext.finish(message: TextMessage, text: String) {
-        replyTo(message, text, commandsKeyboard())
     }
 }
 
