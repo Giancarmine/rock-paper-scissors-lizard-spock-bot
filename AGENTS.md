@@ -14,7 +14,7 @@ working in this repository. Read this before changing code.
   for Telegram, Logback 1.6.6 for logging.
 - **Build:** Gradle 9.8.2 via the committed wrapper (`./gradlew`), with dependency
   versions in `gradle/libs.versions.toml`.
-- **Size:** 23 Kotlin source files, 10 test files, GitHub Actions CI, no persistence.
+- **Size:** 23 Kotlin source files, 11 test files, GitHub Actions CI, no persistence.
 - **Deployment:** single Docker image on **Render** (Docker web service, health check
   `/healthz`). The bot uses Telegram **long polling**, so no webhook is required.
   `.github/workflows/deploy-render.yml` pushes `secrets.BOT_TOKEN` to Render and
@@ -135,6 +135,7 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/test/kotlin/com/el_giancar/infrastructure/logging/LogbackConfigTest.kt` | Verifies that bot tokens are redacted from messages and stack traces. |
 | `src/test/kotlin/com/el_giancar/infrastructure/logging/JulBridgeTest.kt` | Verifies that `java.util.logging` records reach Logback and are redacted. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/GameFlowTest.kt` | Prompt, retry, cancellation, timeout and busy-chat flow tests through a fake `GameIo`. |
+| `src/test/kotlin/com/el_giancar/infrastructure/telegram/IdleTextTest.kt` | Verifies the idle-text hint predicate: commands, blank text, busy chats and group chats are excluded. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/MoveParserTest.kt` | Case-insensitive parsing and per-game move validation. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/MessagesTest.kt` | Exact win/tie wording, both moves, and prompt contents. |
 | `src/main/resources/logback.xml` | Console logging at `info`, with bot-token redaction. |
@@ -168,6 +169,8 @@ Application.kt                        main(): reads config, starts Ktor
    that no game is running when the chat is idle (during a game the `GameFlow` prompt
    already consumes it as a cancellation); unknown commands get a hint via
    `onUnhandledCommand`.
+8. `onText` gives an idle private chat a hint when it receives plain text. It stays
+   silent for commands, for chats where a game holds the lock, and for group chats.
 
 There is **no state**: no database, no scores, no sessions, no per-chat storage.
 Each command is a short-lived coroutine; the only shared state is the in-memory
@@ -227,6 +230,11 @@ derived by looking up the pair in the opposite order.
   handler deliberately stays silent while `ChatLocks.isBusy(chatId)` is true; the
   prompt loop sends the single cancellation reply. Without that guard the user gets
   two messages.
+- The same broadcast applies to `onText`. It must skip commands (handled by
+  `onCommand`/`onUnhandledCommand`), skip chats where a game holds the lock (the
+  prompt loop owns that text), and skip group chats so ordinary conversation is not
+  interrupted. `shouldHintOnIdleText` encodes those rules; keep it covered by
+  `IdleTextTest`.
 - `ChatIdentifier`/`ChatId` is a value class; the lock map is keyed by the underlying
   `Long` (`message.chat.id.chatId.long`).
 - Input is matched against `displayName`, not the enum `name`. Adding a move without

@@ -17,6 +17,7 @@ Docker image.
 - Case-insensitive input with up to three attempts before the game is cancelled.
 - One game per chat at a time, with a two-minute timeout so a chat cannot stay locked.
 - `/cancel` stops the current game, and explains when there is nothing to cancel.
+- Plain text in an idle private chat gets a short hint instead of silence; group chats are left alone.
 - `/healthz` and `/readyz` HTTP endpoints for hosting platforms and monitors.
 - No accounts, scores, or database — every round is independent.
 - Uses Telegram long polling, so no public URL or webhook is required.
@@ -36,6 +37,8 @@ Docker image.
 | anything else | Replies with a hint to use `/commands`. |
 
 During a game, the move keyboard includes `/cancel`; any other command also cancels.
+Outside a game, plain text in a private chat gets a hint to start a game, while group
+chats are not interrupted.
 
 ## Rules
 
@@ -127,8 +130,8 @@ image.
 
 `src/test/kotlin` contains exhaustive pair tables for both game modes, checks for the
 canonical winning phrases, formatting tests for the user-facing messages, move parser
-tests, and `GameFlow` tests for valid moves, retries, cancellation, timeout and a busy
-chat. Tests run on JUnit 5 via `kotlin-test-junit5`.
+tests, `GameFlow` tests for valid moves, retries, cancellation, timeout and a busy
+chat, and idle-text hint tests. Tests run on JUnit 5 via `kotlin-test-junit5`.
 
 ### Health checks
 
@@ -181,7 +184,7 @@ src/test/kotlin/com/el_giancar/
 ├── config/                            # environment config tests
 ├── infrastructure/http/               # /healthz and /readyz route tests
 ├── infrastructure/logging/            # log redaction + JUL bridge tests
-└── infrastructure/telegram/           # messages, move parser, GameFlow tests
+└── infrastructure/telegram/           # messages, move parser, GameFlow, idle-text tests
 ```
 
 ## Known limitations

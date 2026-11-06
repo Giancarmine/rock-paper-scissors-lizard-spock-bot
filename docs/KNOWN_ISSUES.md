@@ -26,6 +26,7 @@ is both a changelog of the review and a list of what still needs owner action.
 | 17 | UX | `/cancel` was not registered, so outside a game it fell through to the generic "use /commands" reply | Registered `/cancel`, added it to the move keyboard and help text. During a game the prompt loop sends the cancellation reply; when idle the handler explains that no game is running. |
 | 18 | Memory | The per-chat mutex map was never evicted | `ChatLocks` now pins entries with a reference count and evicts them through `ConcurrentHashMap.compute` when the last caller releases an unlocked lock. Pinning prevents two callers from acquiring different mutexes for the same chat. |
 | 19 | Testability | The prompt loop could only be exercised through a real Telegram context, so retries, cancellation, timeout and the busy case were untested | Extracted a `GameIo` send/await seam with a real `TelegramGameIo`; `GameFlowTest` covers valid moves, invalid retries, too many attempts, `/cancel`, timeout, busy chats and lock release. |
+| 20 | UX | Plain text sent outside a game was ignored, so a new user could think the bot was broken | Added an `onText` hint for idle private chats. It skips commands, chats where a game holds the lock (the prompt loop owns that text), and group chats so ordinary conversation is not interrupted. |
 
 ## Still requires owner action
 
