@@ -1,6 +1,6 @@
 # Known issues and findings
 
-Status as of 2026-11-05 against `main` plus the remediation changes. This document
+Status as of 2026-11-06 against `main` plus the remediation changes. This document
 is both a changelog of the review and a list of what still needs owner action.
 
 ## Resolved in the remediation change
@@ -27,62 +27,41 @@ is both a changelog of the review and a list of what still needs owner action.
 | 18 | Memory | The per-chat mutex map was never evicted | `ChatLocks` now pins entries with a reference count and evicts them through `ConcurrentHashMap.compute` when the last caller releases an unlocked lock. Pinning prevents two callers from acquiring different mutexes for the same chat. |
 | 19 | Testability | The prompt loop could only be exercised through a real Telegram context, so retries, cancellation, timeout and the busy case were untested | Extracted a `GameIo` send/await seam with a real `TelegramGameIo`; `GameFlowTest` covers valid moves, invalid retries, too many attempts, `/cancel`, timeout, busy chats and lock release. |
 | 20 | UX | Plain text sent outside a game was ignored, so a new user could think the bot was broken | Added an `onText` hint for idle private chats. It skips commands, chats where a game holds the lock (the prompt loop owns that text), and group chats so ordinary conversation is not interrupted. |
+| 21 | Packaging / discoverability | There was no license and the OpenAPI document was only readable from the source tree | Added the MIT `LICENSE` and `GET /openapi.yaml`, which serves the bundled spec with `application/yaml`. `OpenApiRouteTest` covers the status, content type, and body. |
+| 22 | Observability | An idle bot logged an expected `HttpRequestTimeoutException` at ERROR every ~30 seconds, burying real failures | Added `ExpectedLongPollTimeoutFilter`, which drops only timeouts whose URL targets `getUpdates`. Other timeouts and errors still reach the appenders; `ExpectedLongPollTimeoutFilterTest` covers direct, wrapped, and unrelated exceptions. |
 
-## Still requires owner action
+## Security status
 
-### Rotate the leaked token (high priority)
-
-The token that used to be hardcoded has been purged from every commit, but a token
-that was ever committed must be treated as compromised. Forks, existing clones, and
-caches may retain it.
-
-The current token was also pasted into chat and appeared in Render runtime logs:
-tgbotapi includes the request URL (with the token) in error messages. Two layers are
-needed to redact it:
-
-- `logback.xml` redacts `bot<id>:<secret>` from messages and stack traces.
-- `installJulToSlf4jBridge()` routes tgbotapi's `java.util.logging` records through
-  Logback. Without it, those records bypass the pattern and the token leaks.
-
-The token that was already logged must be rotated, and so must any token written to
-the logs before a build with the bridge was deployed. Treat the current value as
-compromised.
-
-1. Revoke the token in [@BotFather](https://t.me/BotFather) and issue a new one.
-2. Store it as the GitHub secret: `gh secret set BOT_TOKEN`.
-3. Run `gh workflow run deploy-render.yml` to update the Render environment variable
-   and redeploy.
-4. Verify `/healthz` returns `OK`, `/readyz` returns `READY`, and send `/start` to the
-   bot.
-5. Wait for a new `HttpRequestTimeoutException` line, then check that Render logs show
-   `bot<redacted>` and no token value. Old log lines keep the value until retention
-   expires, so rotate after the bridge is deployed.
-
-See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the full setup (Render API key and service
-ID) and the rotation runbook. History is already purged; do not rewrite it again
-without explicit approval and coordination with everyone who has a clone.
+The token that once appeared in source and runtime logs has been rotated. No secret
+is committed: production values live in GitHub Actions secrets and the Render
+environment. `logback.xml` redacts `bot<id>:<secret>` from messages and stack traces,
+and `installJulToSlf4jBridge()` routes tgbotapi's `java.util.logging` records through
+Logback so the redaction also applies to library logs. See [`DEPLOYMENT.md`](DEPLOYMENT.md)
+for the rotation runbook.
 
 ## Remaining limitations (accepted for now)
 
-- **No persistence or scores.** Every round is independent.
-- **No license.** Treat as all rights reserved unless the owner adds one.
-- **OpenAPI file is not served.** It is documentation only; if consumers need it
-  over HTTP, add a route.
+- **No persistence or scores.** Every round is independent, and a restart forgets
+  in-flight games.
+- **One instance per token.** Telegram long polling allows a single consumer; a second
+  replica would receive `409 Conflict`. Horizontal scaling needs webhooks plus a shared
+  store.
 - **No Telegram API retry/backoff.** Network errors propagate to the handler
-  coroutine.
-- **Idle long-poll timeouts.** tgbotapi 37 sets the HTTP request timeout equal to
-  Telegram's long-poll timeout, so an idle bot logs
-  `HttpRequestTimeoutException` roughly every 30 seconds. The polling loop retries
-  and updates are not lost. The jul-to-slf4j bridge routes these records through the
-  Logback redaction pattern so the token stays out of the logs.
+  coroutine. The long-poll loop reconnects on the next cycle, but failed replies are
+  not resent.
+- **Pseudo-random moves.** `java.util.Random` is fine for a casual game but not for
+  anything with stakes.
+- **English only.** Messages and commands are not localised.
+- **Idle long-poll timeouts are filtered.** tgbotapi 37 sets the HTTP request timeout
+  equal to Telegram's long-poll timeout, so an idle bot raises
+  `HttpRequestTimeoutException` roughly every 30 seconds. The polling loop retries and
+  no update is lost; `ExpectedLongPollTimeoutFilter` drops only the expected
+  `getUpdates` events, and the jul-to-slf4j bridge keeps the token redacted.
 - **Render free-plan sleep.** The service stops after 15 minutes without inbound
   traffic. `.github/workflows/keepalive.yml` pings `/readyz` every 5 minutes, but
   GitHub can delay scheduled runs. Updates remain queued in Telegram for 24 hours.
 - **Readiness lags a real outage by up to 60 seconds.** The periodic `getMe()` check
   runs every 60 seconds; `/readyz` does not call Telegram on each request.
-- **The per-chat mutex map is bounded by active chats.** Entries are reference-counted
-  and evicted when the last caller releases an unlocked lock; an idle chat does not
-  keep an entry.
 
 ## Verification performed
 
@@ -91,15 +70,16 @@ without explicit approval and coordination with everyone who has a clone.
   `git filter-repo` rewrite; the rewritten HEAD tree matches the pre-rewrite tree.
 - Unit tests added for all 9 classic pairs and all 25 Sheldon pairs, typed outcomes,
   canonical phrase checks, exact message formatting, move parsing, chat-lock eviction,
-  the `GameFlow` prompt loop, and `testApplication` checks for `GET /healthz` and both
-  states of `GET /readyz`.
-- `./gradlew clean test buildFatJar` passes with Temurin JDK 21; the fat jar starts
-  and fails fast with a clear message when `BOT_TOKEN` is missing.
-- The `/healthz` and `/readyz` routes were smoke-tested against a running fat jar
-  and against the deployed Render service.
+  the `GameFlow` prompt loop, and `testApplication` checks for `GET /healthz`, both
+  states of `GET /readyz`, and `GET /openapi.yaml`.
+- `./gradlew clean test buildFatJar` passes with Temurin JDK 21 (48 tests); the fat
+  jar starts and fails fast with a clear message when `BOT_TOKEN` is missing.
+- The `/healthz`, `/readyz`, and `/openapi.yaml` routes were smoke-tested against a
+  running fat jar and against the deployed Render service.
 - The logback configuration is tested with a fake bot token in a message and a stack
-  trace; the output contains `bot<redacted>` and not the token.
+  trace; the output contains `bot<redacted>` and not the token. The timeout filter is
+  tested with direct, wrapped, and unrelated exceptions.
 - Render deploy `dep-dbm7vl942hec73dtvg3g` (commit `a93437c`) reached **Live** and
-  `/healthz` returned `200 OK`.
+  `/healthz` returned `200 OK`; later commits followed the same deploy check.
 - Runtime smoke test of the Telegram path requires a valid token and was not
   performed.

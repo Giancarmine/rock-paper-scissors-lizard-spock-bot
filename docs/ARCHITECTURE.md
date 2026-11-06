@@ -11,6 +11,7 @@ flowchart LR
     TG <-->|long polling over HTTPS| Bot[Bot process<br/>Ktor Netty :$PORT]
     Health[Platform health check] -->|GET /healthz| Bot
     Monitor[Keepalive / uptime monitor] -->|GET /readyz| Bot
+    Tooling[API tooling / browser] -->|GET /openapi.yaml| Bot
     Bot --> Flow[GameFlow<br/>prompt, timeout, chat lock]
     Flow --> Classic[ClassicGameService]
     Flow --> Sheldon[SheldonGameService]
@@ -20,14 +21,15 @@ flowchart LR
 The bot is an outbound-only client of the Telegram Bot API. It does not expose a
 webhook, so it can run behind NAT or on a PaaS without a public URL. It is deployed
 to Render as a Docker web service; the Ktor server binds `0.0.0.0:$PORT` (Render
-provides `PORT`, default 8080) and serves only `GET /healthz` (liveness) and
-`GET /readyz` (Telegram connectivity).
+provides `PORT`, default 8080) and serves only `GET /healthz` (liveness),
+`GET /readyz` (Telegram connectivity), and `GET /openapi.yaml` (the bundled API
+description).
 
 ## Components
 
 | Component | File | Responsibility |
 | --- | --- | --- |
-| Entry point | `src/main/kotlin/com/el_giancar/Application.kt` | Composition root: reads `AppConfig`, starts `embeddedServer(Netty)`, installs `/healthz` and `/readyz`, wires services, then runs the Telegram loop on the main thread. |
+| Entry point | `src/main/kotlin/com/el_giancar/Application.kt` | Composition root: reads `AppConfig`, starts `embeddedServer(Netty)`, installs `/healthz`, `/readyz`, and `/openapi.yaml`, wires services, then runs the Telegram loop on the main thread. |
 | Config | `src/main/kotlin/com/el_giancar/config/AppConfig.kt` | Reads `BOT_TOKEN` and `PORT`; fails fast when the token is missing. |
 | Telegram adapter | `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Creates the bot, registers commands and the idle-text hint, runs long polling, and refreshes readiness with a 60-second `getMe()` monitor. |
 | Game flow | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameFlow.kt` | Acquires the per-chat lock, prompts for a move, applies the two-minute timeout, and renders the result. Telegram I/O goes through `GameIo`. |
@@ -35,15 +37,16 @@ provides `PORT`, default 8080) and serves only `GET /healthz` (liveness) and
 | Move parser | `src/main/kotlin/com/el_giancar/infrastructure/telegram/MoveParser.kt` | Maps trimmed, case-insensitive text to a legal move of the selected game. |
 | Keyboards / messages | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Keyboards.kt`, `Messages.kt`, `Replies.kt` | Reply keyboards, user-facing text, and shared reply helpers. |
 | HTTP adapter | `src/main/kotlin/com/el_giancar/infrastructure/http/HealthRoutes.kt` | `GET /healthz` (always 200) and `GET /readyz` (200/503 from the readiness state). |
+| OpenAPI adapter | `src/main/kotlin/com/el_giancar/infrastructure/http/OpenApiRoutes.kt` | `GET /openapi.yaml`; loads the bundled spec once and serves it as `application/yaml`. |
 | Move domain | `src/main/kotlin/com/el_giancar/domain/Move.kt`, `ClassicMoveType.kt`, `SheldonMoveType.kt` | Legal moves, their display names, and the two variants. |
 | Round domain | `src/main/kotlin/com/el_giancar/domain/GameOutcome.kt`, `RoundResult.kt` | Typed outcome (`WIN`/`LOSE`/`TIE`) and the resolved round data. |
 | Game application | `src/main/kotlin/com/el_giancar/application/Game.kt`, `GameRules.kt`, `GameService.kt` | Variant contract, legal moves + winning phrases, and shared round resolution. Stateless and Telegram-free. |
 | Game variants | `src/main/kotlin/com/el_giancar/application/ClassicGameService.kt`, `SheldonGameService.kt` | The 3-move and 5-move rule sets; thin subclasses of `GameService`. |
 | Chat locks | `src/main/kotlin/com/el_giancar/application/ChatLocks.kt` | Reference-counted per-chat `Mutex`; idle entries are evicted after release. Keeps the application layer Telegram-free. |
 | Readiness | `src/main/kotlin/com/el_giancar/application/ReadinessState.kt` | Thread-safe connectivity flag shared by the Telegram adapter and `/readyz`. |
-| Tests | `src/test/kotlin/com/el_giancar/{application,config}/*Test.kt`, `infrastructure/{http,telegram}/` | Exhaustive pair tables, canonical phrases, message formatting, move parsing, environment parsing, health/readiness routes, log redaction, chat-lock eviction, the full `GameFlow` prompt loop through a fake `GameIo`, and the idle-text hint rules. |
-| Logging | `src/main/resources/logback.xml`, `infrastructure/logging/JulBridge.kt` | Console appender at `info`, token redaction, and a JUL-to-SLF4J bridge so tgbotapi logs use the same pattern. |
-| API spec | `src/main/resources/openapi/documentation.yaml` | Description of `/healthz` and `/readyz`; not referenced by code. |
+| Tests | `src/test/kotlin/com/el_giancar/{application,config}/*Test.kt`, `infrastructure/{http,telegram,logging}/` | Exhaustive pair tables, canonical phrases, message formatting, move parsing, environment parsing, health/readiness/OpenAPI routes, log redaction, the idle-timeout filter, chat-lock eviction, the full `GameFlow` prompt loop through a fake `GameIo`, and the idle-text hint rules. |
+| Logging | `src/main/resources/logback.xml`, `infrastructure/logging/JulBridge.kt`, `ExpectedLongPollTimeoutFilter.kt` | Console appender at `info`, token redaction, a JUL-to-SLF4J bridge so tgbotapi logs use the same pattern, and a filter for the expected idle `getUpdates` timeout. |
+| API spec | `src/main/resources/openapi/documentation.yaml` | Description of `/healthz`, `/readyz`, and `/openapi.yaml`; served by `OpenApiRoutes.kt`. |
 | CI | `.github/workflows/ci.yml` | Builds and tests on push/PR. |
 | Deploy | `.github/workflows/deploy-render.yml` | Updates `BOT_TOKEN` on Render and triggers a deploy. |
 
@@ -60,7 +63,7 @@ sequenceDiagram
     Main->>Env: AppConfig.fromEnvironment() (fail fast if BOT_TOKEN is missing)
     Main->>Ktor: embeddedServer(..., port)
     Main->>Ktor: start(wait = false)
-    Ktor->>Ktor: routing { GET /healthz, GET /readyz }
+    Ktor->>Ktor: routing { GET /healthz, GET /readyz, GET /openapi.yaml }
     Main->>TG: runBlocking { runTelegramBot(token, games, locks, readiness) }
     TG->>API: telegramBot(token), getMe()
     TG->>TG: readiness.markReady()
@@ -70,10 +73,10 @@ sequenceDiagram
     Note over Main,Ktor: finally -> readiness.markNotReady(); server.stop(...)
 ```
 
-The HTTP server starts **before** the Telegram loop, so `/healthz` and `/readyz`
-are reachable while the bot is starting. `/healthz` stays 200 regardless of Telegram;
-`/readyz` returns 503 until the first successful `getMe()` and again if the periodic
-connection check fails. `runBlocking` keeps the main thread on the long-polling
+The HTTP server starts **before** the Telegram loop, so `/healthz`, `/readyz`, and
+`/openapi.yaml` are reachable while the bot is starting. `/healthz` stays 200
+regardless of Telegram; `/readyz` returns 503 until the first successful `getMe()`
+and again if the periodic connection check fails. `runBlocking` keeps the main thread on the long-polling
 task; if Telegram startup or polling fails, the exception propagates, the server is
 stopped in `finally`, and the process exits non-zero. Ktor uses a `SupervisorJob`
 for application children, which is why the bot is not launched as a fire-and-forget
@@ -204,7 +207,7 @@ flowchart TB
     RenderAPI --> Render[Render Docker web service]
     Render --> Build[Build stage: gradle buildFatJar]
     Build --> Runtime[Runtime: java -jar /app/app.jar]
-    Runtime --> Health[Ktor 0.0.0.0:$PORT<br/>GET /healthz + /readyz]
+    Runtime --> Health[Ktor 0.0.0.0:$PORT<br/>GET /healthz + /readyz + /openapi.yaml]
     Runtime --> Poll[Telegram long polling]
     Secret[GitHub secret BOT_TOKEN] --> GHA
     Secret -.->|stored as env var| Runtime
@@ -251,7 +254,7 @@ Notes:
 | Change the game timeout | `GameFlow`'s `gameTimeout` parameter |
 | Better randomness / tests | pass a seeded `Random` to the service constructor, or keep using the deterministic overload |
 | Scores / persistence | Introduce a repository keyed by `chat.id`/`user.id`; keep it out of the stateless services |
-| Serve the OpenAPI spec | Add a route that reads `openapi/documentation.yaml`, or use Ktor's OpenAPI plugin |
+| Change the OpenAPI document | `src/main/resources/openapi/documentation.yaml`; the route picks it up automatically at startup |
 | Webhook mode | Replace `buildBehaviourWithLongPolling` with the webhook builder and add a Ktor route |
 
 ## Non-goals

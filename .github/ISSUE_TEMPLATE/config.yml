@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Giancarmine/rock-paper-scissors-lizard-spock-bot/security/advisories/new
+    about: Report token leaks and other vulnerabilities privately. Never open a public issue.
+  - name: Documentation and known issues
+    url: https://github.com/Giancarmine/rock-paper-scissors-lizard-spock-bot/blob/main/docs/KNOWN_ISSUES.md
+    about: Check documented limitations and resolved findings first.
+  - name: Deployment guide
+    url: https://github.com/Giancarmine/rock-paper-scissors-lizard-spock-bot/blob/main/docs/DEPLOYMENT.md
+    about: Render setup, secrets, and the token-rotation runbook.

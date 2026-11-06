@@ -14,7 +14,7 @@ working in this repository. Read this before changing code.
   for Telegram, Logback 1.6.6 for logging.
 - **Build:** Gradle 9.8.2 via the committed wrapper (`./gradlew`), with dependency
   versions in `gradle/libs.versions.toml`.
-- **Size:** 23 Kotlin source files, 11 test files, GitHub Actions CI, no persistence.
+- **Size:** 25 Kotlin source files, 13 test files, GitHub Actions CI, no persistence.
 - **Deployment:** single Docker image on **Render** (Docker web service, health check
   `/healthz`). The bot uses Telegram **long polling**, so no webhook is required.
   `.github/workflows/deploy-render.yml` pushes `secrets.BOT_TOKEN` to Render and
@@ -46,10 +46,9 @@ Rules for agents:
    `java.util.logging` directly on the JVM; `installJulToSlf4jBridge()` in
    `Application.kt` routes those records through Logback. Do not remove it — without
    the bridge, JUL records bypass the redaction pattern and the token is logged.
-4. The old token was purged from git history with `git filter-repo`, but a token
-   that was ever committed must still be treated as compromised and rotated via
-   [@BotFather](https://t.me/BotFather). Do **not** rewrite history again unless the
-   owner explicitly asks.
+4. If a token is ever exposed, rotate it via [@BotFather](https://t.me/BotFather) and
+   update the `BOT_TOKEN` secret. Do not rewrite git history unless the owner
+   explicitly asks.
 5. Do not add tokens to `Dockerfile`, `build.gradle.kts`, source files, or workflow
    files.
 6. Production tokens live in GitHub Actions secrets: `BOT_TOKEN`,
@@ -83,8 +82,9 @@ docker run --rm -p 8080:8080 -e BOT_TOKEN="<your-token>" rpsls-bot
 
 Notes:
 
-- Ktor binds `0.0.0.0:$PORT` (default 8080) and serves only `/healthz` and
-  `/readyz`. All real functionality goes through Telegram long polling.
+- Ktor binds `0.0.0.0:$PORT` (default 8080) and serves only `/healthz`,
+  `/readyz`, and `/openapi.yaml`. All real functionality goes through Telegram long
+  polling.
 - The bot does nothing useful without a valid token and outbound HTTPS access to
   `api.telegram.org`.
 
@@ -92,10 +92,10 @@ Notes:
 
 ```text
 Application.kt                        main(): reads config, starts Ktor
-  │                                   (GET /healthz, /readyz), then runBlocking { runTelegramBot }
+  │                                   (GET /healthz, /readyz, /openapi.yaml), then runBlocking { runTelegramBot }
   ├─ config/AppConfig.kt              BOT_TOKEN / PORT from the environment
-  ├─ infrastructure/http/             liveness + readiness routes
-  ├─ infrastructure/logging/          JulBridge.kt: JUL -> SLF4J so redaction applies
+  ├─ infrastructure/http/             liveness, readiness, and OpenAPI routes
+  ├─ infrastructure/logging/          JulBridge.kt + ExpectedLongPollTimeoutFilter.kt
   └─ infrastructure/telegram/         TelegramBot.kt: command wiring + long polling + readiness monitor
        ├─ GameFlow.kt                 prompt loop, timeout, per-chat lock
        ├─ GameIo.kt                   send/await seam (real + fake implementations)
@@ -107,7 +107,7 @@ Application.kt                        main(): reads config, starts Ktor
 
 | Path | Responsibility |
 | --- | --- |
-| `src/main/kotlin/com/el_giancar/Application.kt` | Composition root: reads config, starts Ktor with `/healthz` and `/readyz`, wires services, then runs Telegram on the main thread. |
+| `src/main/kotlin/com/el_giancar/Application.kt` | Composition root: reads config, starts Ktor with `/healthz`, `/readyz`, and `/openapi.yaml`, wires services, then runs Telegram on the main thread. |
 | `src/main/kotlin/com/el_giancar/config/AppConfig.kt` | Reads `BOT_TOKEN` and `PORT`; fails fast when the token is missing. |
 | `src/main/kotlin/com/el_giancar/domain/Move.kt` | Move contract: human-readable `displayName`. |
 | `src/main/kotlin/com/el_giancar/domain/GameOutcome.kt` | `WIN` / `LOSE` / `TIE` from the player's point of view. |
@@ -122,6 +122,8 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/main/kotlin/com/el_giancar/application/ChatLocks.kt` | Reference-counted per-chat `Mutex`; entries are evicted when the last caller releases an unlocked lock. |
 | `src/main/kotlin/com/el_giancar/application/ReadinessState.kt` | Thread-safe flag for Telegram connectivity, updated by the bot and read by `/readyz`. |
 | `src/main/kotlin/com/el_giancar/infrastructure/http/HealthRoutes.kt` | `GET /healthz` (liveness) and `GET /readyz` (Telegram readiness) routes. |
+| `src/main/kotlin/com/el_giancar/infrastructure/http/OpenApiRoutes.kt` | `GET /openapi.yaml`; reads the bundled spec once at startup and serves it as `application/yaml`. |
+| `src/main/kotlin/com/el_giancar/infrastructure/logging/ExpectedLongPollTimeoutFilter.kt` | Logback turbo filter that drops only the expected idle `getUpdates` request timeout. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Bot wiring: commands, long polling, and the 60-second readiness monitor. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameFlow.kt` | Prompt loop, 2-minute timeout, per-chat lock, result rendering. Telegram I/O goes through `GameIo`. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameIo.kt` | `GameIo` seam (send/await text) with the real `TelegramGameIo` implementation, so the flow is unit-testable. |
@@ -132,27 +134,31 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/test/kotlin/com/el_giancar/application/*Test.kt` | Exhaustive pair tables for both games, typed results, and chat-lock eviction. |
 | `src/test/kotlin/com/el_giancar/config/AppConfigTest.kt` | Environment parsing and fail-fast behavior. |
 | `src/test/kotlin/com/el_giancar/infrastructure/http/HealthRouteTest.kt` | Ktor tests for `GET /healthz` and `GET /readyz` (ready and not ready). |
+| `src/test/kotlin/com/el_giancar/infrastructure/http/OpenApiRouteTest.kt` | Verifies `GET /openapi.yaml` status, content type, bundled body, and injected document. |
+| `src/test/kotlin/com/el_giancar/infrastructure/logging/ExpectedLongPollTimeoutFilterTest.kt` | Verifies that only `getUpdates` timeouts are dropped, including wrapped exceptions. |
 | `src/test/kotlin/com/el_giancar/infrastructure/logging/LogbackConfigTest.kt` | Verifies that bot tokens are redacted from messages and stack traces. |
 | `src/test/kotlin/com/el_giancar/infrastructure/logging/JulBridgeTest.kt` | Verifies that `java.util.logging` records reach Logback and are redacted. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/GameFlowTest.kt` | Prompt, retry, cancellation, timeout and busy-chat flow tests through a fake `GameIo`. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/IdleTextTest.kt` | Verifies the idle-text hint predicate: commands, blank text, busy chats and group chats are excluded. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/MoveParserTest.kt` | Case-insensitive parsing and per-game move validation. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/MessagesTest.kt` | Exact win/tie wording, both moves, and prompt contents. |
-| `src/main/resources/logback.xml` | Console logging at `info`, with bot-token redaction. |
-| `src/main/resources/openapi/documentation.yaml` | Documents `/healthz` and `/readyz` (not served by Ktor). |
+| `src/main/resources/logback.xml` | Console logging at `info`, bot-token redaction, and the idle-timeout filter. |
+| `src/main/resources/openapi/documentation.yaml` | Documents `/healthz`, `/readyz`, and `/openapi.yaml`; served by `OpenApiRoutes.kt`. |
 | `Dockerfile`, `.dockerignore` | Two-stage JDK 21 build, fat jar runtime. |
 | `.github/workflows/ci.yml` | CI: `./gradlew build buildFatJar` on Temurin 21. |
 | `.github/workflows/deploy-render.yml` | Updates `BOT_TOKEN` on Render and triggers a deploy. |
 | `.github/workflows/keepalive.yml` | Pings `/readyz` every 5 minutes so the free Render service stays awake, and fails if the Telegram connection is dead. |
 | `docs/DEPLOYMENT.md` | Render setup, secrets, and token-rotation runbook. |
+| `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md` | Contribution workflow, private vulnerability reporting, and release notes. |
+| `.github/dependabot.yml`, issue/PR templates | Dependency updates and contribution scaffolding. |
 | `build.gradle.kts`, `gradle/libs.versions.toml` | Build logic and dependency versions. |
 
 ### Telegram update flow
 
 1. `main()` builds `AppConfig` from `BOT_TOKEN` (failing fast if absent) and `PORT`,
-   starts Ktor with `/healthz` and `/readyz`, then calls `runTelegramBot(...)`, which
-   builds the bot, both games, and a readiness monitor, then starts
-   `buildBehaviourWithLongPolling`.
+   starts Ktor with `/healthz`, `/readyz`, and `/openapi.yaml`, then calls
+   `runTelegramBot(...)`, which builds the bot, both games, and a readiness monitor,
+   then starts `buildBehaviourWithLongPolling`.
 2. `onCommand("classic_game" | "sheldon_game")` calls `GameFlow.play(...)`, which
    acquires a **per-chat mutex** so two games cannot run in the same chat at once.
    If the chat is busy, the user is told to finish the current game.
@@ -240,20 +246,23 @@ derived by looking up the pair in the opposite order.
 - Input is matched against `displayName`, not the enum `name`. Adding a move without
   setting `displayName` (and without listing it in `/rules`) makes it invisible in
   the UI even though the rules would accept it.
-- The OpenAPI YAML is documentation only; no Ktor route serves it.
+- The OpenAPI YAML is served at `GET /openapi.yaml` by `OpenApiRoutes.kt`; update
+  the resource when the HTTP surface changes.
 - tgbotapi 37 sets the HTTP request timeout equal to Telegram's long-poll timeout,
-  so an idle bot logs an `HttpRequestTimeoutException` roughly every 30 seconds. The
-  polling loop recovers on the next request and updates are not lost. Do not remove
-  the log redaction pattern or the jul-to-slf4j bridge because that exception message
-  contains the token.
+  so an idle bot raises an `HttpRequestTimeoutException` roughly every 30 seconds.
+  The polling loop recovers on the next request and updates are not lost.
+  `ExpectedLongPollTimeoutFilter` drops only those `getUpdates` timeouts; do not widen
+  it to all timeouts. Do not remove the log redaction pattern or the jul-to-slf4j
+  bridge because that exception message contains the token.
 - Render's free plan sleeps after 15 minutes without inbound traffic. The scheduled
   `keepalive.yml` workflow pings `/readyz`; keep it enabled while on the free plan.
   `/healthz` must stay a liveness probe (always 200): pointing it at Telegram state
   would make the platform restart a process that is merely disconnected.
 - `getNames<T>()` was removed together with string-based parsing. Do not reintroduce
   it unless it has a real caller.
-- The old bot token was removed from all commits, but copies/forks/caches may still
-  contain it; rotation is an owner action.
+- Never commit a token. If one is exposed, rotate it via @BotFather, update the
+  `BOT_TOKEN` secret, and redeploy; the redaction pattern and JUL bridge protect new
+  logs but cannot scrub old ones.
 
 ## Common tasks
 
@@ -307,8 +316,7 @@ token.
    `OK`, `/readyz` returns `READY`, then send `/start` to the bot.
 5. Confirm Render logs show `bot<redacted>` and not the token.
 
-See `docs/DEPLOYMENT.md`. History was already purged; do not rewrite it again without
-explicit owner approval and coordination with all clones.
+See `docs/DEPLOYMENT.md` for the full rotation runbook and the deploy checks.
 
 ## Verification checklist
 
@@ -330,6 +338,9 @@ Before declaring a change done:
 ## Related documents
 
 - `README.md` — human-facing overview and run instructions.
+- `CONTRIBUTING.md` — branch, test, and pull-request workflow.
+- `SECURITY.md` — private vulnerability reporting and token-rotation steps.
+- `CHANGELOG.md` — notable changes in Keep a Changelog format.
 - `docs/ARCHITECTURE.md` — deeper design and flow.
 - `docs/DEPLOYMENT.md` — Render setup, GitHub secrets, and token rotation.
 - `docs/KNOWN_ISSUES.md` — current status of known findings.

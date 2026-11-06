@@ -1,0 +1,52 @@
+name: Feature request
+description: Suggest a bot behaviour, endpoint, or developer-experience improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a request, check
+        [the known issues](https://github.com/Giancarmine/rock-paper-scissors-lizard-spock-bot/blob/main/docs/KNOWN_ISSUES.md)
+        for limitations that are already known and intentionally accepted.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is hard, missing, or confusing today?
+      placeholder: As a player, I cannot ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behaviour or API you would like.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Telegram gameplay
+        - HTTP probes or OpenAPI
+        - Deployment and free-plan hosting
+        - Tests, CI, or developer experience
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: This can work on Render's free plan and with Telegram long polling.
+          required: true
+        - label: This does not require committing or logging a bot token.
+          required: true

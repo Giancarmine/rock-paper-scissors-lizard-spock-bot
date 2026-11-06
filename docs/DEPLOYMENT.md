@@ -145,8 +145,6 @@ new token is written to the logs again.
   pattern or the bridge: without the bridge, JUL records bypass Logback and the token
   is logged in plaintext. If a token still appears in Render logs, rotate it
   immediately and check that the deployed build installs the bridge.
-- A token that was ever committed is compromised even after history is rewritten:
-  rotate it, and remember that forks/clones/caches may retain the old value.
 - Render environment groups are not updated by this workflow; it only updates
   service-level variables.
 
