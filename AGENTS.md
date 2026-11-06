@@ -14,7 +14,7 @@ working in this repository. Read this before changing code.
   for Telegram, Logback 1.6.6 for logging.
 - **Build:** Gradle 9.8.2 via the committed wrapper (`./gradlew`), with dependency
   versions in `gradle/libs.versions.toml`.
-- **Size:** 21 Kotlin source files, 8 test files, GitHub Actions CI, no persistence.
+- **Size:** 23 Kotlin source files, 10 test files, GitHub Actions CI, no persistence.
 - **Deployment:** single Docker image on **Render** (Docker web service, health check
   `/healthz`). The bot uses Telegram **long polling**, so no webhook is required.
   `.github/workflows/deploy-render.yml` pushes `secrets.BOT_TOKEN` to Render and
@@ -97,7 +97,8 @@ Application.kt                        main(): reads config, starts Ktor
   ├─ infrastructure/http/             liveness + readiness routes
   ├─ infrastructure/logging/          JulBridge.kt: JUL -> SLF4J so redaction applies
   └─ infrastructure/telegram/         TelegramBot.kt: command wiring + long polling + readiness monitor
-       ├─ GameFlow.kt                 prompt, 2-minute timeout, chat lock
+       ├─ GameFlow.kt                 prompt loop, timeout, per-chat lock
+       ├─ GameIo.kt                   send/await seam (real + fake implementations)
        ├─ MoveParser.kt               text -> move (case-insensitive)
        ├─ Messages.kt / Keyboards.kt  user-facing text and keyboards
        ├─ domain/*.kt                 Move, move enums, GameOutcome, RoundResult
@@ -122,16 +123,18 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/main/kotlin/com/el_giancar/application/ReadinessState.kt` | Thread-safe flag for Telegram connectivity, updated by the bot and read by `/readyz`. |
 | `src/main/kotlin/com/el_giancar/infrastructure/http/HealthRoutes.kt` | `GET /healthz` (liveness) and `GET /readyz` (Telegram readiness) routes. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Bot wiring: commands, long polling, and the 60-second readiness monitor. |
-| `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameFlow.kt` | Prompt loop, 2-minute timeout, per-chat lock, result rendering. |
+| `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameFlow.kt` | Prompt loop, 2-minute timeout, per-chat lock, result rendering. Telegram I/O goes through `GameIo`. |
+| `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameIo.kt` | `GameIo` seam (send/await text) with the real `TelegramGameIo` implementation, so the flow is unit-testable. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/MoveParser.kt` | Case-insensitive text-to-move parsing. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Replies.kt` | Shared reply/menu helpers. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Keyboards.kt` | Reply keyboards (move buttons use display names). |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Messages.kt` | All user-facing text and `RoundResult` formatting. |
-| `src/test/kotlin/com/el_giancar/application/*Test.kt` | Exhaustive pair tables for both games and typed results. |
+| `src/test/kotlin/com/el_giancar/application/*Test.kt` | Exhaustive pair tables for both games, typed results, and chat-lock eviction. |
 | `src/test/kotlin/com/el_giancar/config/AppConfigTest.kt` | Environment parsing and fail-fast behavior. |
 | `src/test/kotlin/com/el_giancar/infrastructure/http/HealthRouteTest.kt` | Ktor tests for `GET /healthz` and `GET /readyz` (ready and not ready). |
 | `src/test/kotlin/com/el_giancar/infrastructure/logging/LogbackConfigTest.kt` | Verifies that bot tokens are redacted from messages and stack traces. |
 | `src/test/kotlin/com/el_giancar/infrastructure/logging/JulBridgeTest.kt` | Verifies that `java.util.logging` records reach Logback and are redacted. |
+| `src/test/kotlin/com/el_giancar/infrastructure/telegram/GameFlowTest.kt` | Prompt, retry, cancellation, timeout and busy-chat flow tests through a fake `GameIo`. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/MoveParserTest.kt` | Case-insensitive parsing and per-game move validation. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/MessagesTest.kt` | Exact win/tie wording, both moves, and prompt contents. |
 | `src/main/resources/logback.xml` | Console logging at `info`, with bot-token redaction. |
@@ -153,8 +156,8 @@ Application.kt                        main(): reads config, starts Ktor
    acquires a **per-chat mutex** so two games cannot run in the same chat at once.
    If the chat is busy, the user is told to finish the current game.
 3. `GameFlow` sends a prompt with a one-time reply keyboard and waits for a text
-   message **from the same chat** with `waitTextMessage().first { ... }`, wrapped in
-   a two-minute `withTimeoutOrNull`.
+   message **from the same chat** through `GameIo` (the real implementation uses
+   `waitTextMessage().first { ... }`), wrapped in a two-minute `withTimeoutOrNull`.
 4. `MoveParser` trims the text and matches it case-insensitively against each move's
    `displayName`. Invalid input gets a hint and up to `maxMoveAttempts` (3) retries;
    any command cancels the game. A timeout releases the lock with a clear message.

@@ -25,6 +25,7 @@ is both a changelog of the review and a list of what still needs owner action.
 | 16 | Observability | `/healthz` only proved the HTTP server was up, so a dead Telegram session or revoked token still looked healthy | Added `/readyz`: `200` when connected, `503` otherwise. Readiness is set by the startup `getMe()` and refreshed by a 60-second `getMe()` monitor. `/healthz` stays a liveness probe so a Telegram outage does not cause a restart loop. |
 | 17 | UX | `/cancel` was not registered, so outside a game it fell through to the generic "use /commands" reply | Registered `/cancel`, added it to the move keyboard and help text. During a game the prompt loop sends the cancellation reply; when idle the handler explains that no game is running. |
 | 18 | Memory | The per-chat mutex map was never evicted | `ChatLocks` now pins entries with a reference count and evicts them through `ConcurrentHashMap.compute` when the last caller releases an unlocked lock. Pinning prevents two callers from acquiring different mutexes for the same chat. |
+| 19 | Testability | The prompt loop could only be exercised through a real Telegram context, so retries, cancellation, timeout and the busy case were untested | Extracted a `GameIo` send/await seam with a real `TelegramGameIo`; `GameFlowTest` covers valid moves, invalid retries, too many attempts, `/cancel`, timeout, busy chats and lock release. |
 
 ## Still requires owner action
 
@@ -88,8 +89,9 @@ without explicit approval and coordination with everyone who has a clone.
 - `grep` for the old token: absent from tracked files and from every commit after the
   `git filter-repo` rewrite; the rewritten HEAD tree matches the pre-rewrite tree.
 - Unit tests added for all 9 classic pairs and all 25 Sheldon pairs, typed outcomes,
-  canonical phrase checks, exact message formatting, move parsing, and
-  `testApplication` checks for `GET /healthz` and both states of `GET /readyz`.
+  canonical phrase checks, exact message formatting, move parsing, chat-lock eviction,
+  the `GameFlow` prompt loop, and `testApplication` checks for `GET /healthz` and both
+  states of `GET /readyz`.
 - `./gradlew clean test buildFatJar` passes with Temurin JDK 21; the fat jar starts
   and fails fast with a clear message when `BOT_TOKEN` is missing.
 - The `/healthz` and `/readyz` routes were smoke-tested against a running fat jar

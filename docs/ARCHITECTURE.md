@@ -30,7 +30,8 @@ provides `PORT`, default 8080) and serves only `GET /healthz` (liveness) and
 | Entry point | `src/main/kotlin/com/el_giancar/Application.kt` | Composition root: reads `AppConfig`, starts `embeddedServer(Netty)`, installs `/healthz` and `/readyz`, wires services, then runs the Telegram loop on the main thread. |
 | Config | `src/main/kotlin/com/el_giancar/config/AppConfig.kt` | Reads `BOT_TOKEN` and `PORT`; fails fast when the token is missing. |
 | Telegram adapter | `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Creates the bot, registers commands, runs long polling, and refreshes readiness with a 60-second `getMe()` monitor. |
-| Game flow | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameFlow.kt` | Acquires the per-chat lock, prompts for a move, applies the two-minute timeout, and renders the result. |
+| Game flow | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameFlow.kt` | Acquires the per-chat lock, prompts for a move, applies the two-minute timeout, and renders the result. Telegram I/O goes through `GameIo`. |
+| Game I/O | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameIo.kt` | `GameIo` send/await seam plus the real `TelegramGameIo`, so the flow is testable without a bot. |
 | Move parser | `src/main/kotlin/com/el_giancar/infrastructure/telegram/MoveParser.kt` | Maps trimmed, case-insensitive text to a legal move of the selected game. |
 | Keyboards / messages | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Keyboards.kt`, `Messages.kt`, `Replies.kt` | Reply keyboards, user-facing text, and shared reply helpers. |
 | HTTP adapter | `src/main/kotlin/com/el_giancar/infrastructure/http/HealthRoutes.kt` | `GET /healthz` (always 200) and `GET /readyz` (200/503 from the readiness state). |
@@ -40,7 +41,7 @@ provides `PORT`, default 8080) and serves only `GET /healthz` (liveness) and
 | Game variants | `src/main/kotlin/com/el_giancar/application/ClassicGameService.kt`, `SheldonGameService.kt` | The 3-move and 5-move rule sets; thin subclasses of `GameService`. |
 | Chat locks | `src/main/kotlin/com/el_giancar/application/ChatLocks.kt` | Reference-counted per-chat `Mutex`; idle entries are evicted after release. Keeps the application layer Telegram-free. |
 | Readiness | `src/main/kotlin/com/el_giancar/application/ReadinessState.kt` | Thread-safe connectivity flag shared by the Telegram adapter and `/readyz`. |
-| Tests | `src/test/kotlin/com/el_giancar/{application,config}/*Test.kt`, `infrastructure/{http,telegram}/` | Exhaustive pair tables, canonical phrases, message formatting, move parsing, environment parsing, the health/readiness routes, and log redaction. |
+| Tests | `src/test/kotlin/com/el_giancar/{application,config}/*Test.kt`, `infrastructure/{http,telegram}/` | Exhaustive pair tables, canonical phrases, message formatting, move parsing, environment parsing, health/readiness routes, log redaction, chat-lock eviction, and the full `GameFlow` prompt loop through a fake `GameIo`. |
 | Logging | `src/main/resources/logback.xml`, `infrastructure/logging/JulBridge.kt` | Console appender at `info`, token redaction, and a JUL-to-SLF4J bridge so tgbotapi logs use the same pattern. |
 | API spec | `src/main/resources/openapi/documentation.yaml` | Description of `/healthz` and `/readyz`; not referenced by code. |
 | CI | `.github/workflows/ci.yml` | Builds and tests on push/PR. |
