@@ -1,6 +1,6 @@
 # Known issues and findings
 
-Status as of 2026-11-06 against `main` plus the remediation changes. This document
+Status as of 2026-11-08 against `main` plus the remediation changes. This document
 is both a changelog of the review and a list of what still needs owner action.
 
 ## Resolved in the remediation change
@@ -30,6 +30,7 @@ is both a changelog of the review and a list of what still needs owner action.
 | 21 | Packaging / discoverability | There was no license and the OpenAPI document was only readable from the source tree | Added the MIT `LICENSE` and `GET /openapi.yaml`, which serves the bundled spec with `application/yaml`. `OpenApiRouteTest` covers the status, content type, and body. |
 | 22 | Observability | An idle bot logged an expected `HttpRequestTimeoutException` at ERROR every ~30 seconds, burying real failures | Added `ExpectedLongPollTimeoutFilter`, which drops only timeouts whose URL targets `getUpdates`. Other timeouts and errors still reach the appenders; `ExpectedLongPollTimeoutFilterTest` covers direct, wrapped, and unrelated exceptions. |
 | 23 | Tooling | Kotlin formatting was enforced only by convention, so style drift could land unnoticed | Adopted the ktlint Gradle plugin 14.2.0, added `ktlintCheck` to CI, disabled only `standard:package-name` for the intentional `com.el_giancar` underscore, and applied the formatter to the existing sources. |
+| 24 | Features / persistence | Every round was independent, so players could not see scores or compete across chats | Added optional PostgreSQL score tracking: `/stats`, `/leaderboard`, and `/chat_leaderboard`, one `players` row plus per-chat aggregates, automatic schema creation, and H2-backed repository tests. A missing or unreachable database leaves gameplay unchanged and the commands explain that tracking is disabled or unavailable. Credentials embedded in `DATABASE_URL` are moved out of the JDBC URL before the pool is created. |
 
 ## Security status
 
@@ -37,13 +38,16 @@ The token that once appeared in source and runtime logs has been rotated. No sec
 is committed: production values live in GitHub Actions secrets and the Render
 environment. `logback.xml` redacts `bot<id>:<secret>` from messages and stack traces,
 and `installJulToSlf4jBridge()` routes tgbotapi's `java.util.logging` records through
-Logback so the redaction also applies to library logs. See [`DEPLOYMENT.md`](DEPLOYMENT.md)
-for the rotation runbook.
+Logback so the redaction also applies to library logs. Database credentials follow the
+same rule: they live in optional GitHub secrets, the deploy workflow never echoes them,
+and the app strips `user:password@` from `DATABASE_URL` before creating the JDBC pool.
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the rotation runbook.
 
 ## Remaining limitations (accepted for now)
 
-- **No persistence or scores.** Every round is independent, and a restart forgets
-  in-flight games.
+- **Scores are optional and remote.** Completed rounds are stored in PostgreSQL when
+  `DATABASE_URL` is set; a restart forgets in-flight games, and without a database the
+  bot plays but stats commands stay disabled. A database outage only affects scores.
 - **One instance per token.** Telegram long polling allows a single consumer; a second
   replica would receive `409 Conflict`. Horizontal scaling needs webhooks plus a shared
   store.
@@ -71,9 +75,10 @@ for the rotation runbook.
   `git filter-repo` rewrite; the rewritten HEAD tree matches the pre-rewrite tree.
 - Unit tests added for all 9 classic pairs and all 25 Sheldon pairs, typed outcomes,
   canonical phrase checks, exact message formatting, move parsing, chat-lock eviction,
-  the `GameFlow` prompt loop, and `testApplication` checks for `GET /healthz`, both
-  states of `GET /readyz`, and `GET /openapi.yaml`.
-- `./gradlew clean test buildFatJar` passes with Temurin JDK 21 (52 tests); the fat
+  the `GameFlow` prompt loop, player labels, stats fallback behavior, H2-backed
+  repository and leaderboard queries, and `testApplication` checks for `GET /healthz`,
+  both states of `GET /readyz`, and `GET /openapi.yaml`.
+- `./gradlew clean test buildFatJar` passes with Temurin JDK 21 (79 tests); the fat
   jar starts and fails fast with a clear message when `BOT_TOKEN` is missing.
 - The `/healthz`, `/readyz`, and `/openapi.yaml` routes were smoke-tested against a
   running fat jar and against the deployed Render service.

@@ -26,6 +26,9 @@ jobs:
       RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
       RENDER_SERVICE_ID: ${{ github.event.inputs.service_id || vars.RENDER_SERVICE_ID }}
       BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_USER: ${{ secrets.DATABASE_USER }}
+      DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
     steps:
       - name: Validate required configuration
         run: |
@@ -50,6 +53,26 @@ jobs:
               "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/env-vars/BOT_TOKEN" \
               > /dev/null
           echo "Updated BOT_TOKEN on the Render service."
+
+      - name: Update optional database settings on Render
+        run: |
+          set -euo pipefail
+          for name in DATABASE_URL DATABASE_USER DATABASE_PASSWORD; do
+            value="${!name:-}"
+            if [ -n "$value" ]; then
+              jq -n --arg value "$value" '{value: $value}' |
+                curl --fail-with-body --silent --show-error \
+                  --request PUT \
+                  --header "Authorization: Bearer ${RENDER_API_KEY}" \
+                  --header "Content-Type: application/json" \
+                  --data @- \
+                  "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/env-vars/${name}" \
+                  > /dev/null
+              echo "Updated ${name} on the Render service."
+            else
+              echo "Skipping ${name}: not configured."
+            fi
+          done
 
       - name: Trigger Render deploy
         run: |

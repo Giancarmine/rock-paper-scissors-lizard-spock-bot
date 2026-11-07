@@ -17,6 +17,11 @@ internal fun commandsKeyboard(): ReplyKeyboardMarkup =
             simpleButton("/rules")
         }
         row {
+            simpleButton("/stats")
+            simpleButton("/leaderboard")
+            simpleButton("/chat_leaderboard")
+        }
+        row {
             simpleButton("/help")
             simpleButton("/commands")
             simpleButton("/about")

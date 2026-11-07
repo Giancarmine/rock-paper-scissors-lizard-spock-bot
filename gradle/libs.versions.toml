@@ -6,6 +6,9 @@ slf4j = "2.0.20"
 tgbotapi = "37.1.0"
 junit = "6.1.3"
 ktlint = "14.2.0"
+hikari = "7.1.0"
+postgresql = "42.7.14"
+h2 = "2.5.252"
 
 [libraries]
 kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5", version.ref = "kotlin" }
@@ -18,6 +21,9 @@ ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref 
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 slf4j-jul = { module = "org.slf4j:jul-to-slf4j", version.ref = "slf4j" }
 tgbotapi = { module = "dev.inmo:tgbotapi", version.ref = "tgbotapi" }
+hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

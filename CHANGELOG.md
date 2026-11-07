@@ -10,6 +10,14 @@ in `build.gradle.kts` is the source of truth for releases.
 
 ### Added
 
+- Optional PostgreSQL score tracking with `/stats`, `/leaderboard`, and
+  `/chat_leaderboard`. Wins are worth one point; ties and losses are worth zero.
+- HikariCP + PostgreSQL JDBC in production, H2 in PostgreSQL mode for repository tests,
+  and automatic schema creation on first startup.
+- `DATABASE_URL` (plus optional `DATABASE_USER` / `DATABASE_PASSWORD`) configuration and
+  optional Render environment updates in the deploy workflow.
+- Graceful stats fallback: without a database the bot still plays, and a failed read or
+  write only makes the stats commands report that tracking is disabled or unavailable.
 - MIT license.
 - `GET /openapi.yaml`, which serves the OpenAPI 3.0 document bundled with the
   application.
@@ -21,6 +29,8 @@ in `build.gradle.kts` is the source of truth for releases.
 
 ### Changed
 
+- `GameFlow.play` now returns the completed `RoundResult` (or `null` for cancellations,
+  timeouts, busy chats, and invalid attempts) so only finished rounds are recorded.
 - Expanded the README badges, project layout, and known-limitations section.
 - Documented the OpenAPI route in `docs/ARCHITECTURE.md` and `AGENTS.md`.
 - Corrected the documented HTTP surface, JUnit version, and timeout-filter guidance in

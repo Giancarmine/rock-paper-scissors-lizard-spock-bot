@@ -11,6 +11,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -22,7 +23,7 @@ class GameFlowTest {
         runBlocking {
             val io = FakeGameIo("  rOcK ")
 
-            GameFlow(ChatLocks()).play(chatId = 1L, game = game, io = io)
+            val result = GameFlow(ChatLocks()).play(chatId = 1L, game = game, io = io)
 
             assertEquals(2, io.sent.size)
             assertTrue(io.sent[0].contains("Your move!"), io.sent[0])
@@ -30,6 +31,7 @@ class GameFlowTest {
                 resultMessage(RoundResult(ClassicMoveType.ROCK, ClassicMoveType.SCISSORS, GameOutcome.WIN, "Rock crushes Scissors")),
                 io.sent[1],
             )
+            assertEquals(GameOutcome.WIN, result?.outcome)
         }
 
     @Test
@@ -61,10 +63,11 @@ class GameFlowTest {
         runBlocking {
             val io = FakeGameIo("/cancel")
 
-            GameFlow(ChatLocks()).play(chatId = 1L, game = game, io = io)
+            val result = GameFlow(ChatLocks()).play(chatId = 1L, game = game, io = io)
 
             assertEquals(2, io.sent.size)
             assertEquals(cancelledMessage, io.sent[1])
+            assertNull(result)
         }
 
     @Test
@@ -73,10 +76,12 @@ class GameFlowTest {
             val chatLocks = ChatLocks()
             val io = FakeGameIo()
 
-            GameFlow(chatLocks, gameTimeout = 50.milliseconds)
-                .play(chatId = 1L, game = game, io = io)
+            val result =
+                GameFlow(chatLocks, gameTimeout = 50.milliseconds)
+                    .play(chatId = 1L, game = game, io = io)
 
             assertEquals(timeoutMessage, io.sent.last())
+            assertNull(result)
             assertFalse(chatLocks.isBusy(1L))
             assertEquals(0, chatLocks.trackedChats())
         }
@@ -90,9 +95,10 @@ class GameFlowTest {
 
             try {
                 val io = FakeGameIo("Rock")
-                GameFlow(chatLocks).play(chatId = 1L, game = game, io = io)
+                val result = GameFlow(chatLocks).play(chatId = 1L, game = game, io = io)
 
                 assertEquals(listOf(busyMessage), io.sent)
+                assertNull(result)
             } finally {
                 holder.release()
             }

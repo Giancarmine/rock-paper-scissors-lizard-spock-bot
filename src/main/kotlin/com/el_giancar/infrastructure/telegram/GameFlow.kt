@@ -3,6 +3,7 @@ package com.el_giancar.infrastructure.telegram
 import com.el_giancar.application.ChatLocks
 import com.el_giancar.application.Game
 import com.el_giancar.domain.Move
+import com.el_giancar.domain.RoundResult
 import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
 import dev.inmo.tgbotapi.types.message.content.TextMessage
 import kotlinx.coroutines.withTimeoutOrNull
@@ -28,24 +29,23 @@ internal class GameFlow(
         context: BehaviourContext,
         message: TextMessage,
         game: Game<M>,
-    ) {
+    ): RoundResult<M>? =
         play(
             chatId = message.chat.id.chatId.long,
             game = game,
             io = ioFor(context, message),
         )
-    }
 
     internal suspend fun <M : Move> play(
         chatId: Long,
         game: Game<M>,
         io: GameIo,
-    ) {
+    ): RoundResult<M>? {
         val chatLock = chatLocks.acquire(chatId)
         if (!chatLock.tryLock()) {
             chatLock.release()
             io.send(busyMessage, keyboard = null)
-            return
+            return null
         }
 
         try {
@@ -54,15 +54,24 @@ internal class GameFlow(
                     awaitMove(game.moves, io)
                 }
 
-            when {
-                attempt == null -> io.send(timeoutMessage, commandsKeyboard())
-                attempt.status == MoveAttemptStatus.CANCELLED ->
+            return when {
+                attempt == null -> {
+                    io.send(timeoutMessage, commandsKeyboard())
+                    null
+                }
+                attempt.status == MoveAttemptStatus.CANCELLED -> {
                     io.send(cancelledMessage, commandsKeyboard())
-                attempt.status == MoveAttemptStatus.TOO_MANY_ATTEMPTS ->
+                    null
+                }
+                attempt.status == MoveAttemptStatus.TOO_MANY_ATTEMPTS -> {
                     io.send(tooManyAttemptsMessage, commandsKeyboard())
+                    null
+                }
                 else -> {
                     val move = requireNotNull(attempt.move) { "A selected attempt must carry a move" }
-                    io.send(resultMessage(game.play(move)), commandsKeyboard())
+                    val result = game.play(move)
+                    io.send(resultMessage(result), commandsKeyboard())
+                    result
                 }
             }
         } finally {

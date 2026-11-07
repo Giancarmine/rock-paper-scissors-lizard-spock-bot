@@ -26,4 +26,37 @@ class AppConfigTest {
             AppConfig.fromEnvironment(emptyMap())
         }
     }
+
+    @Test
+    fun `reads optional database settings`() {
+        val config =
+            AppConfig.fromEnvironment(
+                mapOf(
+                    "BOT_TOKEN" to "token",
+                    "DATABASE_URL" to "postgresql://db.example.com/neondb",
+                    "DATABASE_USER" to "alice",
+                    "DATABASE_PASSWORD" to "secret",
+                ),
+            )
+
+        assertEquals("postgresql://db.example.com/neondb", config.databaseUrl)
+        assertEquals("alice", config.databaseUser)
+        assertEquals("secret", config.databasePassword)
+    }
+
+    @Test
+    fun `treats blank database settings as absent`() {
+        val config =
+            AppConfig.fromEnvironment(
+                mapOf(
+                    "BOT_TOKEN" to "token",
+                    "DATABASE_URL" to "  ",
+                    "DATABASE_USER" to "",
+                ),
+            )
+
+        assertEquals(null, config.databaseUrl)
+        assertEquals(null, config.databaseUser)
+        assertEquals(null, config.databasePassword)
+    }
 }
