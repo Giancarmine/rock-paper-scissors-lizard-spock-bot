@@ -78,21 +78,28 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the rotation runbook.
   the `GameFlow` prompt loop, player labels, stats fallback behavior, H2-backed
   repository and leaderboard queries, and `testApplication` checks for `GET /healthz`,
   both states of `GET /readyz`, and `GET /openapi.yaml`.
-- `./gradlew clean test buildFatJar` passes with Temurin JDK 21 (79 tests); the fat
-  jar starts and fails fast with a clear message when `BOT_TOKEN` is missing.
+- `./gradlew ktlintCheck test buildFatJar` passes with Temurin JDK 21 (80 tests); the
+  fat jar starts and fails fast with a clear message when `BOT_TOKEN` is missing.
 - The `/healthz`, `/readyz`, and `/openapi.yaml` routes were smoke-tested against a
   running fat jar and against the deployed Render service.
 - The logback configuration is tested with a fake bot token in a message and a stack
   trace; the output contains `bot<redacted>` and not the token. The timeout filter is
   tested with direct, wrapped, and unrelated exceptions.
-- Render deploy `dep-dbms4i15efls738f61d0` (commit `a27ab46`, the text refinements)
-  reached **Live** at 12:06 UTC. `/healthz` returned `200 OK`, `/readyz` returned
-  `200 READY`, `/openapi.yaml` returned `200 application/yaml`, and the logs showed the
-  Telegram connection without raw tokens. The earlier `dep-dbmks32jnfac73apcbm0`
-  deploy (commit `8c984f4`) was verified the same way.
-- The running image corresponds to `a27ab46`; later commits are documentation-only
+- Render deploy `dep-dbnr3km7bikc73dah2j0` (commit `23d3c41`, player statistics)
+  reached **Live** at 23:20 UTC on 2026-11-07. `/healthz` returned `200 OK`, `/readyz`
+  returned `200 READY`, `/openapi.yaml` returned `200 application/yaml`, and the logs
+  showed the Telegram connection without raw tokens. `DATABASE_URL` is not configured
+  yet, so this deploy runs with score tracking disabled, as designed.
+- The earlier `dep-dbms4i15efls738f61d0` deploy (commit `a27ab46`, the text
+  refinements) and `dep-dbmks32jnfac73apcbm0` (commit `8c984f4`) were verified the
+  same way.
+- The running image corresponds to `23d3c41`; later commits are documentation-only
   updates, so no redeploy is required for them.
 - Runtime verification of the Telegram path: the Render logs show
   `Connected to Telegram as @RockPaperScissorsLizardSpockBot`, and `/readyz` returned
   `READY`. An interactive `/start` exchange still requires the owner's Telegram
   client.
+- Score-tracking verification against a real PostgreSQL instance is still pending:
+  no `DATABASE_URL` is configured yet. The SQL, ranking, and fallback behavior are
+  covered by H2-backed and fake-store tests, and the deployed bot currently reports
+  that tracking is disabled.
