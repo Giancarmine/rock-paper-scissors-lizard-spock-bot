@@ -11,12 +11,14 @@ provides with `GET /healthz` (liveness) and `GET /readyz` (Telegram connectivity
 GitHub Actions (deploy-render.yml)
   ├─ reads secrets.BOT_TOKEN, secrets.RENDER_API_KEY, vars.RENDER_SERVICE_ID
   ├─ PUT /v1/services/{id}/env-vars/BOT_TOKEN   (updates the runtime token)
+  ├─ PUT /v1/services/{id}/env-vars/DATABASE_*  (only when configured)
   ├─ POST /v1/services/{id}/deploys             (rebuilds and redeploys)
   └─ Render builds the Dockerfile and runs the container
 ```
 
 The token is **never** baked into the image or committed. It is sent to Render at
-deploy time and stored as a service environment variable.
+deploy time and stored as a service environment variable. Database credentials follow
+the same path when score tracking is enabled.
 
 ## One-time setup
 
@@ -55,7 +57,31 @@ gh variable set RENDER_SERVICE_ID --body "srv-xxxxxxxxxxxxxxxx"
 
 You can also add them in GitHub → Settings → Secrets and variables → Actions.
 
-### 4. Deploy
+### 4. Optional: enable score tracking
+
+Scores need a PostgreSQL database. [Neon](https://neon.tech/) and
+[Supabase](https://supabase.com/) both have free tiers and work over the public
+internet; no Render add-on is required.
+
+1. Create a project and copy its PostgreSQL connection URL. It looks like
+   `postgresql://user:password@host/db?sslmode=require`. Keep it out of the
+   repository and chat.
+2. Store it as a GitHub Actions secret:
+   ```bash
+   gh secret set DATABASE_URL
+   ```
+   `DATABASE_USER` and `DATABASE_PASSWORD` are optional and only needed when the URL
+   does not contain credentials.
+3. Run the deploy workflow. It copies the configured values to the Render service
+   before triggering the deploy.
+
+The bot creates the `players` and `player_chat_stats` tables on first startup. Without
+`DATABASE_URL`, the service still starts and plays games; `/stats` and the
+leaderboards reply that tracking is disabled. If the database is temporarily
+unreachable, gameplay continues and the stats commands report that tracking is
+unavailable. Startup logs only the exception type, never the URL or credentials.
+
+### 5. Deploy
 
 Run the workflow manually:
 
@@ -152,6 +178,11 @@ new token is written to the logs again.
   immediately and check that the deployed build installs the bridge.
 - Render environment groups are not updated by this workflow; it only updates
   service-level variables.
+- Database credentials are treated like the bot token: store them in GitHub Actions
+  secrets, never in `.env` committed to git, source files, or workflow files. The
+  deploy workflow passes them through `jq` on stdin and never echoes their values.
+  The app extracts `user:password@` from `DATABASE_URL` before building the JDBC URL
+  and logs only the exception type if initialization fails.
 
 ## Troubleshooting
 
@@ -168,3 +199,6 @@ new token is written to the logs again.
 | `/healthz` returns 404 | The deployed revision predates the health route; redeploy. |
 | `/openapi.yaml` returns 404 | The deployed revision predates `OpenApiRoutes`; redeploy a current build. |
 | `/readyz` returns 503 while `/healthz` returns 200 | The process is up but the Telegram connection failed (revoked token, blocked network, or Telegram outage). Check the startup log and Render logs. The bot re-checks every 60 seconds. |
+| `/stats` says tracking is disabled | `DATABASE_URL` is not set on the Render service. Add the GitHub secret and rerun the deploy workflow. |
+| `/stats` says tracking is temporarily unavailable | The database is unreachable or credentials are wrong. Check the Neon/Supabase project status and the Render logs; the warning never prints the URL or password. Restart or redeploy after fixing the connection. |
+| Startup log says the database could not be initialized | The URL is malformed or the database is asleep. Score tracking stays disabled for that process; fix `DATABASE_URL` and redeploy. Games are unaffected. |

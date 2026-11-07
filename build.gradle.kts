@@ -25,11 +25,14 @@ dependencies {
     implementation(libs.logback.classic)
     implementation(libs.slf4j.jul)
     implementation(libs.tgbotapi)
+    implementation(libs.hikari)
+    implementation(libs.postgresql)
 
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.kotlin.test.junit5)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.h2)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 

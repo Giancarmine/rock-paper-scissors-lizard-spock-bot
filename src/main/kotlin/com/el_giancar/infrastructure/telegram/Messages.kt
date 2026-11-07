@@ -1,8 +1,14 @@
 package com.el_giancar.infrastructure.telegram
 
+import com.el_giancar.application.StatsResult
 import com.el_giancar.domain.GameOutcome
+import com.el_giancar.domain.LeaderboardEntry
 import com.el_giancar.domain.Move
+import com.el_giancar.domain.PersonalStats
+import com.el_giancar.domain.PlayerStats
 import com.el_giancar.domain.RoundResult
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 internal val startMessage =
     """
@@ -11,6 +17,7 @@ internal val startMessage =
     |I pick a random move, you pick yours, and I explain the result.
     |
     |Pick a game below, or send /help for the full command list.
+    |Track your score with /stats and see who leads with /leaderboard.
     """.trimMargin()
 
 internal val rulesMessage =
@@ -40,6 +47,9 @@ internal val helpMessage =
     |/sheldon_game — play Rock, Paper, Scissors, Lizard, Spock
     |/cancel — cancel the current game
     |/rules — show which move beats which
+    |/stats — show your score in this chat and overall
+    |/leaderboard — show the global top 10
+    |/chat_leaderboard — show this chat's top 10
     |/commands — show the command keyboard
     |/about — show info and source code
     |/help — show this message
@@ -111,3 +121,84 @@ internal fun resultMessage(result: RoundResult<*>): String =
             GameOutcome.TIE -> append("🤝 It's a tie!")
         }
     }
+
+internal val statsDisabledMessage =
+    "📊 Score tracking is disabled because the bot has no database configured.\n" +
+        "Games still work; leaderboards are unavailable."
+
+internal val statsUnavailableMessage =
+    "⚠️ Score tracking is temporarily unavailable.\n" +
+        "Games still work; please try again in a moment."
+
+internal val noPersonalStatsMessage =
+    "📊 You haven't finished a game yet.\n" +
+        "Play one with /classic_game or /sheldon_game to start tracking your score."
+
+internal val emptyLeaderboardMessage =
+    "🏆 No games have been recorded yet.\n" +
+        "Play one with /classic_game or /sheldon_game to get on the board."
+
+internal fun statsMessage(result: StatsResult<PersonalStats>): String =
+    when (result) {
+        StatsResult.Disabled -> statsDisabledMessage
+        StatsResult.Unavailable -> statsUnavailableMessage
+        is StatsResult.Success -> personalStatsMessage(result.value)
+    }
+
+internal fun personalStatsMessage(stats: PersonalStats): String {
+    if (stats.overall.games == 0) {
+        return noPersonalStatsMessage
+    }
+
+    return buildString {
+        append("📊 Your stats\n\n")
+        append("This chat\n")
+        append(statsSummary(stats.chat))
+        append("\n\nAll chats\n")
+        append(statsSummary(stats.overall))
+        stats.overall.lastPlayed?.let {
+            append("\n\nLast played: ").append(utcFormatter.format(it))
+        }
+    }
+}
+
+internal fun globalLeaderboardMessage(result: StatsResult<List<LeaderboardEntry>>): String =
+    leaderboardMessage("🏆 Global leaderboard", result)
+
+internal fun chatLeaderboardMessage(result: StatsResult<List<LeaderboardEntry>>): String =
+    leaderboardMessage("🏆 This chat's leaderboard", result)
+
+private fun leaderboardMessage(
+    title: String,
+    result: StatsResult<List<LeaderboardEntry>>,
+): String =
+    when (result) {
+        StatsResult.Disabled -> statsDisabledMessage
+        StatsResult.Unavailable -> statsUnavailableMessage
+        is StatsResult.Success ->
+            if (result.value.isEmpty()) {
+                emptyLeaderboardMessage
+            } else {
+                buildString {
+                    append(title)
+                    result.value.forEach { entry ->
+                        append("\n\n")
+                        append(entry.rank).append(". ").append(entry.displayName).append(" — ")
+                        append(entry.points).append(if (entry.points == 1) " point" else " points")
+                        append(" · ").append(entry.games).append(if (entry.games == 1) " game" else " games")
+                    }
+                }
+            }
+    }
+
+private fun statsSummary(stats: PlayerStats): String =
+    buildString {
+        append("Games: ").append(stats.games)
+        append(" · Wins: ").append(stats.wins)
+        append(" · Losses: ").append(stats.losses)
+        append(" · Ties: ").append(stats.ties)
+        append("\nPoints: ").append(stats.points)
+    }
+
+private val utcFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC)

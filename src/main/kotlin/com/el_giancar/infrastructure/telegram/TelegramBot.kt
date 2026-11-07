@@ -5,7 +5,9 @@ package com.el_giancar.infrastructure.telegram
 import com.el_giancar.application.ChatLocks
 import com.el_giancar.application.Game
 import com.el_giancar.application.ReadinessState
+import com.el_giancar.application.StatsService
 import com.el_giancar.domain.ClassicMoveType
+import com.el_giancar.domain.GameOutcome
 import com.el_giancar.domain.SheldonMoveType
 import dev.inmo.tgbotapi.extensions.api.bot.getMe
 import dev.inmo.tgbotapi.extensions.api.telegramBot
@@ -14,6 +16,8 @@ import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onComman
 import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onText
 import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onUnhandledCommand
 import dev.inmo.tgbotapi.types.chat.PrivateChat
+import dev.inmo.tgbotapi.types.message.abstracts.ChatContentMessage
+import dev.inmo.tgbotapi.types.message.content.TextContent
 import dev.inmo.tgbotapi.utils.PreviewFeature
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancelAndJoin
@@ -33,6 +37,7 @@ suspend fun runTelegramBot(
     sheldonGame: Game<SheldonMoveType>,
     chatLocks: ChatLocks,
     readiness: ReadinessState,
+    statsService: StatsService,
     connectionCheckInterval: Duration = 60.seconds,
 ) {
     val bot = telegramBot(token)
@@ -91,11 +96,49 @@ suspend fun runTelegramBot(
                     }
 
                     onCommand("classic_game") { message ->
-                        gameFlow.play(this, message, classicGame)
+                        gameFlow.play(this, message, classicGame)?.let { result ->
+                            recordResult(message, result.outcome, statsService)
+                        }
                     }
 
                     onCommand("sheldon_game") { message ->
-                        gameFlow.play(this, message, sheldonGame)
+                        gameFlow.play(this, message, sheldonGame)?.let { result ->
+                            recordResult(message, result.outcome, statsService)
+                        }
+                    }
+
+                    onCommand("stats") { message ->
+                        val player = message.playerOrNull()
+                        val text =
+                            if (player == null) {
+                                statsUnavailableMessage
+                            } else {
+                                statsMessage(
+                                    statsService.personalStats(
+                                        playerId = player.id,
+                                        chatId = message.chat.id.chatId.long,
+                                    ),
+                                )
+                            }
+                        replyTo(message, text, commandsKeyboard())
+                    }
+
+                    onCommand("leaderboard") { message ->
+                        replyTo(
+                            message,
+                            globalLeaderboardMessage(statsService.globalLeaderboard()),
+                            commandsKeyboard(),
+                        )
+                    }
+
+                    onCommand("chat_leaderboard") { message ->
+                        replyTo(
+                            message,
+                            chatLeaderboardMessage(
+                                statsService.chatLeaderboard(message.chat.id.chatId.long),
+                            ),
+                            commandsKeyboard(),
+                        )
                     }
 
                     onCommand("commands") { message ->
@@ -154,3 +197,16 @@ internal fun shouldHintOnIdleText(
         !chatIsBusy &&
         text.isNotBlank() &&
         !text.trimStart().startsWith("/")
+
+private suspend fun recordResult(
+    message: ChatContentMessage<TextContent>,
+    outcome: GameOutcome,
+    statsService: StatsService,
+) {
+    val player = message.playerOrNull() ?: return
+    statsService.recordGame(
+        player = player,
+        chatId = message.chat.id.chatId.long,
+        outcome = outcome,
+    )
+}
