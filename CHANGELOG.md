@@ -39,6 +39,12 @@ in `build.gradle.kts` is the source of truth for releases.
   descriptions, retry counts on invalid moves, and a license note in `/about`.
 - Applied ktlint formatting across the Kotlin sources.
 
+### Fixed
+
+- Group chats: only the player who started a game can supply its move. Other members'
+  text no longer plays (or cancels) someone else's game, and the round is credited to
+  the right player.
+
 ### Security
 
 - Removed stale guidance that the previously exposed token still needed rotation;

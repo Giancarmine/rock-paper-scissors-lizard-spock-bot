@@ -111,7 +111,7 @@ sequenceDiagram
     else lock acquired
         B->>TG: "Your move!" + reply keyboard
         U->>TG: spock (lowercase is accepted)
-        TG-->>B: text update (same chat)
+        TG-->>B: text update (same chat and player)
         B->>B: trim + case-insensitive match
         B->>S: play(SPOCK)
         S->>S: random move + winning phrase lookup

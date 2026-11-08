@@ -189,8 +189,9 @@ Application.kt                        main(): reads config, starts Ktor
    acquires a **per-chat mutex** so two games cannot run in the same chat at once.
    If the chat is busy, the user is told to finish the current game.
 3. `GameFlow` sends a prompt with a one-time reply keyboard and waits for a text
-   message **from the same chat** through `GameIo` (the real implementation uses
-   `waitTextMessage().first { ... }`), wrapped in a two-minute `withTimeoutOrNull`.
+   message **from the same chat and the player who started the game** through `GameIo`
+   (the real implementation uses `waitTextMessage().first { ... }`), wrapped in a
+   two-minute `withTimeoutOrNull`.
 4. `MoveParser` trims the text and matches it case-insensitively against each move's
    `displayName`. Invalid input gets a hint and up to `maxMoveAttempts` (3) retries;
    any command cancels the game. A timeout releases the lock with a clear message.
@@ -270,6 +271,10 @@ derived by looking up the pair in the opposite order.
 - `waitTextMessage()` expects the update flow of the command's subcontext. Command
   handlers already filter by chat (`MessageFilterByChat`); the explicit chat-id check
   is a second safety net. Do not remove either without evaluating concurrency.
+- `TelegramGameIo.awaitText()` accepts text only from the chat **and** the user who
+  started the game (`isMoveFromOriginatingPlayer`). In a group, other members' moves
+  and commands are ignored so a round cannot be played or credited to the wrong
+  player. Keep the helper and `GameIoTest` in sync if you change the filter.
 - tgbotapi broadcasts each update to every trigger and to `waitTextMessage()`. During
   a game, `/cancel` reaches both the registered handler and the prompt loop, so the
   handler deliberately stays silent while `ChatLocks.isBusy(chatId)` is true; the
