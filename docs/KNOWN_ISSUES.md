@@ -11,7 +11,7 @@ is both a changelog of the review and a list of what still needs owner action.
 | 2 | Robustness | Invalid/lowercase input caused `NullPointerException` via `playerMove!!` | Input is trimmed, matched case-insensitively, retried up to 3 times, then cancelled cleanly. No `!!`. |
 | 3 | Correctness | `/classic_game` validated against `SheldonMoveType`, accepting LIZARD/SPOCK | Services now take enum values; the classic handler parses against `ClassicMoveType` only. |
 | 4 | UX | `/help` and `/about` buttons were not implemented | Both commands are registered with real content and listed in help. |
-| 5 | Concurrency | Games could race or consume each other's replies | Per-chat `Mutex` serializes games; `waitTextMessage` is filtered to the originating chat. |
+| 5 | Concurrency | Games could race or consume each other's replies | Per-chat `Mutex` serializes games; `waitTextMessage` is filtered to the originating chat and player. |
 | 6 | Packaging | `EXPOSE 8080:8080`, build/runtime JDK mismatch, unused `ARG TOKEN`, hardcoded jar name, `gradle build` vs fat jar | Multi-stage JDK build with `buildFatJar`, matching runtime, `EXPOSE 8080`, runtime `BOT_TOKEN`, stable `/app/app.jar`. Current images use JDK 21. |
 | 7 | Dependencies | Unused/out-of-sync `ktor-client-okhttp:2.0.1` | Removed. |
 | 8 | Correctness | Unreachable `else` branches re-rolled the RNG | Replaced by a single `error(...)` path in rule lookup. |
@@ -31,6 +31,7 @@ is both a changelog of the review and a list of what still needs owner action.
 | 22 | Observability | An idle bot logged an expected `HttpRequestTimeoutException` at ERROR every ~30 seconds, burying real failures | Added `ExpectedLongPollTimeoutFilter`, which drops only timeouts whose URL targets `getUpdates`. Other timeouts and errors still reach the appenders; `ExpectedLongPollTimeoutFilterTest` covers direct, wrapped, and unrelated exceptions. |
 | 23 | Tooling | Kotlin formatting was enforced only by convention, so style drift could land unnoticed | Adopted the ktlint Gradle plugin 14.2.0, added `ktlintCheck` to CI, disabled only `standard:package-name` for the intentional `com.el_giancar` underscore, and applied the formatter to the existing sources. |
 | 24 | Features / persistence | Every round was independent, so players could not see scores or compete across chats | Added optional PostgreSQL score tracking: `/stats`, `/leaderboard`, and `/chat_leaderboard`, one `players` row plus per-chat aggregates, automatic schema creation, and H2-backed repository tests. A missing or unreachable database leaves gameplay unchanged and the commands explain that tracking is disabled or unavailable. Credentials embedded in `DATABASE_URL` are moved out of the JDBC URL before the pool is created. |
+| 25 | Correctness | In a group chat, any member's text could satisfy another player's prompt, and the round was credited to the command author | `TelegramGameIo` accepts text only from the chat and user that started the game; `isMoveFromOriginatingPlayer` and `GameIoTest` cover the filter. |
 
 ## Security status
 
