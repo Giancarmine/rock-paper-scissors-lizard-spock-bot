@@ -66,13 +66,36 @@ internet; no Render add-on is required.
 1. Create a project and copy its PostgreSQL connection URL. It looks like
    `postgresql://user:password@host/db?sslmode=require`. Keep it out of the
    repository and chat.
-2. Store it as a GitHub Actions secret:
+2. Prefer a dedicated role for the bot instead of the project owner role (on Neon,
+   `neondb_owner`). Use the **pooled** host (the one containing `-pooler`) and a URL
+   of the form:
+   ```text
+   postgresql://bot_user:<password>@<host>-pooler.<region>.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+   ```
+   Percent-encode characters such as `@`, `:`, `/`, and `#` in the password, or use an
+   alphanumeric-only password.
+3. Grant the role the privileges needed for the automatic schema bootstrap. Run this
+   once as the project owner in the provider's SQL editor:
+   ```sql
+   GRANT CONNECT ON DATABASE neondb TO bot_user;
+   GRANT USAGE, CREATE ON SCHEMA public TO bot_user;
+   ```
+   The bot runs `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS` on every
+   start. PostgreSQL checks privileges even when the objects already exist, so if the
+   tables were created by another role, either drop them and let `bot_user` recreate
+   them, or transfer ownership:
+   ```sql
+   ALTER TABLE public.players OWNER TO bot_user;
+   ALTER TABLE public.player_chat_stats OWNER TO bot_user;
+   ALTER INDEX public.idx_player_chat_stats_chat_points OWNER TO bot_user;
+   ```
+4. Store it as a GitHub Actions secret:
    ```bash
    gh secret set DATABASE_URL
    ```
    `DATABASE_USER` and `DATABASE_PASSWORD` are optional and only needed when the URL
    does not contain credentials.
-3. Run the deploy workflow. It copies the configured values to the Render service
+5. Run the deploy workflow. It copies the configured values to the Render service
    before triggering the deploy.
 
 The bot creates the `players` and `player_chat_stats` tables on first startup. Without
@@ -201,4 +224,4 @@ new token is written to the logs again.
 | `/readyz` returns 503 while `/healthz` returns 200 | The process is up but the Telegram connection failed (revoked token, blocked network, or Telegram outage). Check the startup log and Render logs. The bot re-checks every 60 seconds. |
 | `/stats` says tracking is disabled | `DATABASE_URL` is not set on the Render service. Add the GitHub secret and rerun the deploy workflow. |
 | `/stats` says tracking is temporarily unavailable | The database is unreachable or credentials are wrong. Check the Neon/Supabase project status and the Render logs; the warning never prints the URL or password. Restart or redeploy after fixing the connection. |
-| Startup log says the database could not be initialized | The URL is malformed or the database is asleep. Score tracking stays disabled for that process; fix `DATABASE_URL` and redeploy. Games are unaffected. |
+| Startup log says the database could not be initialized | The URL is malformed, the database is asleep, or the role lacks schema/table privileges. Score tracking stays disabled for that process; fix `DATABASE_URL` and the grants, then redeploy. Games are unaffected. |

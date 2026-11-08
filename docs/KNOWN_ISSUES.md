@@ -49,8 +49,10 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the rotation runbook.
   `DATABASE_URL` is set; a restart forgets in-flight games, and without a database the
   bot plays but stats commands stay disabled. A database outage only affects scores.
 - **One instance per token.** Telegram long polling allows a single consumer; a second
-  replica would receive `409 Conflict`. Horizontal scaling needs webhooks plus a shared
-  store.
+  replica would receive `409 Conflict`. Render briefly overlaps the old and new
+  instance during a deploy, so a transient `409 Conflict` in the logs is expected; the
+  new instance takes over and polling recovers. Horizontal scaling needs webhooks plus
+  a shared store.
 - **No Telegram API retry/backoff.** Network errors propagate to the handler
   coroutine. The long-poll loop reconnects on the next cycle, but failed replies are
   not resent.
@@ -93,13 +95,19 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the rotation runbook.
 - The earlier `dep-dbms4i15efls738f61d0` deploy (commit `a27ab46`, the text
   refinements) and `dep-dbmks32jnfac73apcbm0` (commit `8c984f4`) were verified the
   same way.
-- The running image corresponds to `23d3c41`; later commits are documentation-only
-  updates, so no redeploy is required for them.
+- The running image corresponds to `f36dc49`. The commits after `23d3c41` are
+  documentation-only, but `f36dc49` was redeployed to pick up the `bot_user` database
+  credentials.
+- Render deploy `dep-dbnsf9c9v7es73dkup60` (commit `f36dc49`) reached **Live** at
+  00:52 UTC on 2026-11-08 with the dedicated `bot_user` role and the Neon pooled URL.
+  A fresh Hikari connection was created, startup logged `Score tracking is enabled.`,
+  `/healthz` returned `200`, `/readyz` returned `200 READY`, and `/openapi.yaml`
+  returned `200`. The owner then played a round against the deployed bot and confirmed
+  that the statistics path works.
 - Runtime verification of the Telegram path: the Render logs show
   `Connected to Telegram as @RockPaperScissorsLizardSpockBot`, and `/readyz` returned
-  `READY`. An interactive `/start` exchange still requires the owner's Telegram
-  client.
-- Score-tracking verification against a real PostgreSQL instance is still pending:
-  no `DATABASE_URL` is configured yet. The SQL, ranking, and fallback behavior are
-  covered by H2-backed and fake-store tests, and the deployed bot currently reports
-  that tracking is disabled.
+  `READY`. The owner also completed an interactive game and the stats commands.
+- Score tracking is verified against a real PostgreSQL instance: the bot creates the
+  schema as `bot_user` and persists completed rounds. The SQL, ranking, and fallback
+  behavior remain covered by H2-backed and fake-store tests. The exposed owner password
+  was rotated, and the bot no longer uses the owner role.
