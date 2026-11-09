@@ -29,6 +29,9 @@ in `build.gradle.kts` is the source of truth for releases.
 
 ### Changed
 
+- Raised the stats pool connection timeout to 10 seconds and added PostgreSQL
+  connect/login/socket timeouts so a Neon cold start or a stalled socket cannot hang a
+  stats request indefinitely.
 - `GameFlow.play` now returns the completed `RoundResult` (or `null` for cancellations,
   timeouts, busy chats, and invalid attempts) so only finished rounds are recorded.
 - Expanded the README badges, project layout, and known-limitations section.
@@ -44,6 +47,9 @@ in `build.gradle.kts` is the source of truth for releases.
 - Group chats: only the player who started a game can supply its move. Other members'
   text no longer plays (or cancels) someone else's game, and the round is credited to
   the right player.
+- Score tracking retries schema initialization on the first game or stats request
+  instead of staying disabled until a restart when the database was asleep or
+  unreachable at startup.
 
 ### Security
 

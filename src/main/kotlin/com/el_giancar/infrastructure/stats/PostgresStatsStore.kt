@@ -33,16 +33,35 @@ class PostgresStatsStore private constructor(
     // chats at the same time. Serializing writes avoids an update-then-insert race
     // in the two upserts without relying on dialect-specific ON CONFLICT syntax.
     private val writeMutex = Mutex()
+    private val initMutex = Mutex()
 
-    fun initialize() {
-        dataSource.connection.use { connection ->
-            connection.createStatement().use { statement ->
-                SCHEMA.forEach { statement.execute(it) }
+    @Volatile
+    private var initialized = false
+
+    /**
+     * Creates the schema if needed and is safe to call repeatedly.
+     *
+     * A failed attempt leaves the store uninitialized so the next operation retries.
+     * That lets the bot recover when the database is asleep or briefly unreachable
+     * when the process starts, instead of keeping scores disabled until a restart.
+     */
+    suspend fun initialize() {
+        if (initialized) return
+        initMutex.withLock {
+            if (initialized) return@withLock
+            withContext(Dispatchers.IO) {
+                dataSource.connection.use { connection ->
+                    connection.createStatement().use { statement ->
+                        SCHEMA.forEach { statement.execute(it) }
+                    }
+                }
             }
+            initialized = true
         }
     }
 
-    override suspend fun recordGame(record: GameRecord) =
+    override suspend fun recordGame(record: GameRecord) {
+        initialize()
         writeMutex.withLock {
             withContext(Dispatchers.IO) {
                 dataSource.connection.use { connection ->
@@ -60,12 +79,14 @@ class PostgresStatsStore private constructor(
                 }
             }
         }
+    }
 
     override suspend fun personalStats(
         playerId: Long,
         chatId: Long,
-    ): PersonalStats =
-        withContext(Dispatchers.IO) {
+    ): PersonalStats {
+        initialize()
+        return withContext(Dispatchers.IO) {
             dataSource.connection.use { connection ->
                 PersonalStats(
                     overall = readStats(connection, playerId, chatId = null),
@@ -73,10 +94,12 @@ class PostgresStatsStore private constructor(
                 )
             }
         }
+    }
 
-    override suspend fun globalLeaderboard(limit: Int): List<LeaderboardEntry> =
-        withContext(Dispatchers.IO) {
-            require(limit > 0) { "limit must be positive" }
+    override suspend fun globalLeaderboard(limit: Int): List<LeaderboardEntry> {
+        require(limit > 0) { "limit must be positive" }
+        initialize()
+        return withContext(Dispatchers.IO) {
             dataSource.connection.use { connection ->
                 connection
                     .prepareStatement(GLOBAL_LEADERBOARD_SQL)
@@ -101,13 +124,15 @@ class PostgresStatsStore private constructor(
                     }
             }
         }
+    }
 
     override suspend fun chatLeaderboard(
         chatId: Long,
         limit: Int,
-    ): List<LeaderboardEntry> =
-        withContext(Dispatchers.IO) {
-            require(limit > 0) { "limit must be positive" }
+    ): List<LeaderboardEntry> {
+        require(limit > 0) { "limit must be positive" }
+        initialize()
+        return withContext(Dispatchers.IO) {
             dataSource.connection.use { connection ->
                 connection
                     .prepareStatement(CHAT_LEADERBOARD_SQL)
@@ -133,6 +158,7 @@ class PostgresStatsStore private constructor(
                     }
             }
         }
+    }
 
     override fun close() {
         dataSource.close()
@@ -269,9 +295,17 @@ class PostgresStatsStore private constructor(
                     this.password = settings.password
                     maximumPoolSize = 4
                     minimumIdle = 1
-                    connectionTimeout = 5_000
-                    validationTimeout = 3_000
-                    // Do not abort startup when the database is briefly unreachable.
+                    // Neon wakes from scale-to-zero on the first connection, which can
+                    // take longer than the Hikari default. These timeouts also bound a
+                    // stalled socket so a stats call cannot hang forever.
+                    connectionTimeout = 10_000
+                    validationTimeout = 5_000
+                    addDataSourceProperty("connectTimeout", "10")
+                    addDataSourceProperty("loginTimeout", "10")
+                    addDataSourceProperty("socketTimeout", "15")
+                    addDataSourceProperty("tcpKeepAlive", "true")
+                    // Do not abort startup when the database is briefly unreachable;
+                    // initialize() is retried on the first operation.
                     initializationFailTimeout = 0
                     poolName = "stats-pool"
                 }

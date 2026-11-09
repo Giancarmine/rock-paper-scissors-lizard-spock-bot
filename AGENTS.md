@@ -145,7 +145,7 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/main/kotlin/com/el_giancar/infrastructure/http/HealthRoutes.kt` | `GET /healthz` (liveness) and `GET /readyz` (Telegram readiness) routes. |
 | `src/main/kotlin/com/el_giancar/infrastructure/http/OpenApiRoutes.kt` | `GET /openapi.yaml`; reads the bundled spec once at startup and serves it as `application/yaml`. |
 | `src/main/kotlin/com/el_giancar/infrastructure/logging/ExpectedLongPollTimeoutFilter.kt` | Logback turbo filter that drops only the expected idle `getUpdates` request timeout. |
-| `src/main/kotlin/com/el_giancar/infrastructure/stats/PostgresStatsStore.kt` | HikariCP pool, URL credential extraction, schema bootstrap, writes, personal stats, and leaderboards. |
+| `src/main/kotlin/com/el_giancar/infrastructure/stats/PostgresStatsStore.kt` | HikariCP pool, URL credential extraction, retrying schema bootstrap, writes, personal stats, and leaderboards. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Bot wiring: commands, long polling, result recording, and the 60-second readiness monitor. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameFlow.kt` | Prompt loop, 2-minute timeout, per-chat lock, result rendering, and the completed `RoundResult` (or `null`). |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameIo.kt` | `GameIo` seam (send/await text) with the real `TelegramGameIo` implementation, so the flow is unit-testable. |
@@ -211,8 +211,10 @@ Application.kt                        main(): reads config, starts Ktor
 Game state is still in memory: the only shared live state is the per-chat mutex map.
 Completed rounds are the exception — they are written to PostgreSQL when
 `DATABASE_URL` is configured. With no database, scores are disabled; with an
-unreachable database, the stats commands report that tracking is unavailable. Neither
-case blocks a game.
+unreachable database, the stats commands report that tracking is unavailable. A
+database that is asleep or unreachable at startup is retried on the first game or
+stats request, so a transient outage does not require a restart. Neither case blocks a
+game.
 
 ## Game rules (source of truth: the rule sets)
 
@@ -248,6 +250,9 @@ derived by looking up the pair in the opposite order.
   service; `StatsService` converts failures to `StatsResult.Disabled`/`Unavailable`.
 - Never log `DATABASE_URL` or Hikari configuration. The store strips embedded
   credentials before building the JDBC URL, and startup logs only the exception type.
+- Keep schema initialization idempotent and retryable: `PostgresStatsStore.initialize()`
+  is safe to call repeatedly. Do not replace a failed startup initialization with a
+  permanently `null` store; the next operation must be able to retry.
 - Each service exposes two overloads: `play(move)` (random opponent) and
   `play(playerMove, botMove)` (deterministic, used by tests).
 - Move enums use `UPPER_SNAKE_CASE` and set a human-readable `displayName`; reply

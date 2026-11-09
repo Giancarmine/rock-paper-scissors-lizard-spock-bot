@@ -100,9 +100,11 @@ internet; no Render add-on is required.
 
 The bot creates the `players` and `player_chat_stats` tables on first startup. Without
 `DATABASE_URL`, the service still starts and plays games; `/stats` and the
-leaderboards reply that tracking is disabled. If the database is temporarily
-unreachable, gameplay continues and the stats commands report that tracking is
-unavailable. Startup logs only the exception type, never the URL or credentials.
+leaderboards reply that tracking is disabled. If the database is asleep or
+temporarily unreachable at startup, the service keeps the pool and retries schema
+initialization on the first game or stats request; the stats commands report that
+tracking is unavailable until it succeeds. Startup logs only the exception type, never
+the URL or credentials.
 
 ### 5. Deploy
 
@@ -224,4 +226,4 @@ new token is written to the logs again.
 | `/readyz` returns 503 while `/healthz` returns 200 | The process is up but the Telegram connection failed (revoked token, blocked network, or Telegram outage). Check the startup log and Render logs. The bot re-checks every 60 seconds. |
 | `/stats` says tracking is disabled | `DATABASE_URL` is not set on the Render service. Add the GitHub secret and rerun the deploy workflow. |
 | `/stats` says tracking is temporarily unavailable | The database is unreachable or credentials are wrong. Check the Neon/Supabase project status and the Render logs; the warning never prints the URL or password. Restart or redeploy after fixing the connection. |
-| Startup log says the database could not be initialized | The URL is malformed, the database is asleep, or the role lacks schema/table privileges. Score tracking stays disabled for that process; fix `DATABASE_URL` and the grants, then redeploy. Games are unaffected. |
+| Startup log says score tracking is configured but the database is not reachable yet | The database was asleep or unreachable at startup. The bot retries on the first game or stats request, so no redeploy is needed. If it persists, check the URL, credentials, and grants. Games are unaffected. |

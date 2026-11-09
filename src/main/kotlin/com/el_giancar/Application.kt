@@ -13,6 +13,7 @@ import com.el_giancar.infrastructure.stats.PostgresStatsStore
 import com.el_giancar.infrastructure.telegram.runTelegramBot
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 
@@ -25,20 +26,21 @@ fun main() {
 
     val config = AppConfig.fromEnvironment()
     val readiness = ReadinessState()
-    val statsService = createStatsService(config)
 
-    // Start the HTTP server first so /healthz is reachable while the bot runs.
-    // The Telegram long-polling loop then owns the main thread; if it fails, the
-    // process exits and the server is stopped.
-    val server =
-        embeddedServer(Netty, port = config.port, host = "0.0.0.0") {
-            healthRoutes(readiness)
-            openApiRoutes()
-        }
-    server.start(wait = false)
+    runBlocking {
+        val statsService = createStatsService(config)
 
-    try {
-        runBlocking {
+        // Start the HTTP server first so /healthz is reachable while the bot runs.
+        // The Telegram long-polling loop then owns the main thread; if it fails, the
+        // process exits and the server is stopped.
+        val server =
+            embeddedServer(Netty, port = config.port, host = "0.0.0.0") {
+                healthRoutes(readiness)
+                openApiRoutes()
+            }
+        server.start(wait = false)
+
+        try {
             runTelegramBot(
                 token = config.botToken,
                 classicGame = ClassicGameService(),
@@ -47,10 +49,10 @@ fun main() {
                 readiness = readiness,
                 statsService = statsService,
             )
+        } finally {
+            statsService.close()
+            server.stop(gracePeriodMillis = 0, timeoutMillis = 5_000)
         }
-    } finally {
-        statsService.close()
-        server.stop(gracePeriodMillis = 0, timeoutMillis = 5_000)
     }
 }
 
@@ -58,10 +60,12 @@ fun main() {
  * Builds the optional score service.
  *
  * Without `DATABASE_URL` the bot runs with statistics disabled. If the database
- * cannot be initialized, the bot logs only the exception type (never the URL or
- * credentials) and keeps playing without scores.
+ * cannot be reached at startup, the store is kept and every operation retries schema
+ * initialization, so a sleeping or briefly unavailable database does not disable
+ * scores until the next restart. Logs only the exception type, never the URL or
+ * credentials.
  */
-private fun createStatsService(config: AppConfig): StatsService {
+private suspend fun createStatsService(config: AppConfig): StatsService {
     val databaseUrl = config.databaseUrl ?: return StatsService(store = null)
 
     var store: PostgresStatsStore? = null
@@ -75,13 +79,25 @@ private fun createStatsService(config: AppConfig): StatsService {
         store.initialize()
         logger.info("Score tracking is enabled.")
         StatsService(store)
-    } catch (exception: Exception) {
+    } catch (exception: CancellationException) {
         runCatching { store?.close() }
-        logger.warn(
-            "Score tracking is disabled: the database could not be initialized ({}). " +
-                "Check DATABASE_URL and database availability.",
-            exception.javaClass.simpleName,
-        )
-        StatsService(store = null)
+        throw exception
+    } catch (exception: Exception) {
+        val created = store
+        if (created == null) {
+            logger.warn(
+                "Score tracking is disabled: the database pool could not be created ({}). " +
+                    "Check DATABASE_URL.",
+                exception.javaClass.simpleName,
+            )
+            StatsService(store = null)
+        } else {
+            logger.warn(
+                "Score tracking is configured but the database is not reachable yet ({}). " +
+                    "It will retry on first use.",
+                exception.javaClass.simpleName,
+            )
+            StatsService(created)
+        }
     }
 }
