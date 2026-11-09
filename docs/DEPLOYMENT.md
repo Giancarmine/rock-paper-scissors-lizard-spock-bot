@@ -141,9 +141,12 @@ responses, and is safe to re-run after a copy change. The text lives in
 A few settings have no Bot API method and must be changed in
 [@BotFather](https://t.me/BotFather):
 
-- `/setuserpic` — profile picture.
-- `/setjoingroups` — allow or forbid group invites (groups are enabled today).
-- **Add to Group** — the one-tap invite link.
+- `/setuserpic` — upload `docs/assets/bot-icon.png` as the profile picture.
+- `/setjoingroups` — allow or forbid group invites. Groups are already enabled
+  (`can_join_groups: true`).
+
+The add-to-group link needs no BotFather step: use
+`https://t.me/RockPaperScissorsLizardSpockBot?startgroup=true`. The README links to it.
 
 ## Staying on the free plan
 
