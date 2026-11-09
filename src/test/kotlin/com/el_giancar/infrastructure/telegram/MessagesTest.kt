@@ -170,6 +170,27 @@ class MessagesTest {
     }
 
     @Test
+    fun `announces a new chat leader`() {
+        val message = milestoneMessage(Milestone.NewLeader("Alice", points = 7))
+
+        assertTrue(message.contains("Alice"), message)
+        assertTrue(message.contains("#1"), message)
+        assertTrue(message.contains("7 points"), message)
+        assertTrue(message.contains("/classic_game"), message)
+        assertTrue(message.contains("/sheldon_game"), message)
+    }
+
+    @Test
+    fun `announces a point milestone`() {
+        val message = milestoneMessage(Milestone.Points("Bob", points = 25))
+
+        assertTrue(message.contains("Bob"), message)
+        assertTrue(message.contains("25 points"), message)
+        assertTrue(message.contains("/classic_game"), message)
+        assertTrue(message.contains("/sheldon_game"), message)
+    }
+
+    @Test
     fun `formats personal stats for this chat and overall`() {
         val stats =
             PersonalStats(

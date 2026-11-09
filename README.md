@@ -36,6 +36,10 @@ Docker image.
 - Uses Telegram long polling, so no public URL or webhook is required.
 - A share button on every completed round, group onboarding, and `/start` deep-link
   attribution for share campaigns.
+- Group milestones: a new chat leader or a round point total is announced once, so the
+  chat celebrates progress without narrating every win.
+- Inline mode: type `@RockPaperScissorsLizardSpockBot` in any chat to post a Play and
+  Share card. Inline mode must be enabled once in BotFather (`/setinline`).
 
 ## Commands
 
@@ -58,6 +62,18 @@ During a game, the move keyboard includes `/cancel`; any other command also canc
 Invalid moves get a hint with the remaining tries; after three invalid moves the game
 is cancelled. Outside a game, plain text in a private chat gets a hint to start a game,
 while group chats are not interrupted.
+
+### Play inline
+
+Type `@RockPaperScissorsLizardSpockBot` in any chat and pick a result to post a card
+with a **Play** button and a **Share** button. The query can name a variant:
+
+- `@RockPaperScissorsLizardSpockBot classic` — classic card
+- `@RockPaperScissorsLizardSpockBot lizard` or `spock` — five-move card
+- anything else — both cards
+
+Inline mode has to be enabled once in [@BotFather](https://t.me/BotFather) with
+`/setinline`; the bot code works either way.
 
 ## Rules
 
@@ -246,6 +262,8 @@ src/main/kotlin/com/el_giancar/
         ├── GameFlow.kt                # prompt, timeout, lock, result
         ├── GameIo.kt                  # send/await seam for flow tests
         ├── GroupOnboarding.kt         # add-to-group detection
+        ├── InlineResults.kt           # inline-mode cards
+        ├── Milestones.kt              # new-leader and point milestones
         ├── MoveParser.kt              # text -> move
         ├── Players.kt                 # Telegram user -> Player
         ├── Replies.kt                 # shared reply helpers
@@ -303,6 +321,8 @@ verification that backs each item.
 - **Pseudo-random moves.** `java.util.Random` is fine for a casual game but not
   suitable when stakes or fairness guarantees matter.
 - **English only.** Messages and commands are not localised.
+- **Inline mode needs a one-time BotFather toggle.** The bot answers inline queries, but
+  Telegram only sends them after the owner enables inline mode with `/setinline`.
 - **Telegram only.** There is no web or mobile front end; HTTP is limited to the
   health probes and the OpenAPI document.
 - **A game that receives no move for two minutes is cancelled automatically**, and

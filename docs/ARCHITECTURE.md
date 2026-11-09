@@ -34,11 +34,13 @@ description).
 | --- | --- | --- |
 | Entry point | `src/main/kotlin/com/el_giancar/Application.kt` | Composition root: reads `AppConfig`, starts `embeddedServer(Netty)`, installs `/healthz`, `/readyz`, and `/openapi.yaml`, wires services, then runs the Telegram loop on the main thread. |
 | Config | `src/main/kotlin/com/el_giancar/config/AppConfig.kt` | Reads `BOT_TOKEN`, `PORT`, and the optional `DATABASE_URL` / `DATABASE_USER` / `DATABASE_PASSWORD`; fails fast when the token is missing. |
-| Telegram adapter | `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Creates the bot, registers game/stats commands and the idle-text hint, runs long polling, records completed rounds, and refreshes readiness with a 60-second `getMe()` monitor. |
+| Telegram adapter | `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Creates the bot, registers game/stats commands, group onboarding, milestones, inline queries, and the idle-text hint, runs long polling, records completed rounds, and refreshes readiness with a 60-second `getMe()` monitor. |
 | Game flow | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameFlow.kt` | Acquires the per-chat lock, prompts for a move, applies the two-minute timeout, renders the result, and returns the completed `RoundResult` (or `null` when nothing was played). |
 | Game I/O | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameIo.kt` | `GameIo` send/await seam plus the real `TelegramGameIo`, so the flow is testable without a bot. |
+| Milestones | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Milestones.kt` | Pure detection of a new chat leader or an exact point total from before/after leaderboards. |
+| Inline results | `src/main/kotlin/com/el_giancar/infrastructure/telegram/InlineResults.kt` | Builds the inline-mode Play/Share cards and filters them by the query. |
 | Move parser | `src/main/kotlin/com/el_giancar/infrastructure/telegram/MoveParser.kt` | Maps trimmed, case-insensitive text to a legal move of the selected game. |
-| Keyboards / messages | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Keyboards.kt`, `Messages.kt`, `Replies.kt` | Reply keyboards, user-facing text, and shared reply helpers. |
+| Keyboards / messages | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Keyboards.kt`, `Messages.kt`, `Replies.kt` | Reply and share/inline keyboards, user-facing text, and shared reply helpers. |
 | HTTP adapter | `src/main/kotlin/com/el_giancar/infrastructure/http/HealthRoutes.kt` | `GET /healthz` (always 200) and `GET /readyz` (200/503 from the readiness state). |
 | OpenAPI adapter | `src/main/kotlin/com/el_giancar/infrastructure/http/OpenApiRoutes.kt` | `GET /openapi.yaml`; loads the bundled spec once and serves it as `application/yaml`. |
 | Move domain | `src/main/kotlin/com/el_giancar/domain/Move.kt`, `ClassicMoveType.kt`, `SheldonMoveType.kt` | Legal moves, their display names, and the two variants. |
@@ -118,10 +120,13 @@ sequenceDiagram
         S-->>B: RoundResult(playerMove, botMove, outcome, rulePhrase)
         B->>M: resultMessage(result)
         M-->>B: "You: Spock\nMe: Rock\n\n🎉 You win! Spock vaporizes Rock."
-        B->>TG: result + commands keyboard
+        B->>TG: result + share keyboard
         B->>L: unlock(chatId)
         B-->>St: recordGame(player, chatId, WIN)
         St->>DB: upsert player + increment chat stats
+        B->>St: chat standing before/after (groups only)
+        St-->>B: points + leaderboard
+        B->>TG: milestone message (at most one)
     end
 ```
 
@@ -141,9 +146,17 @@ Key points:
   played. `TelegramBot` records that result through `StatsService` after the reply is
   sent; cancellations, timeouts, and invalid attempts return `null` and are not
   counted. A missing or failing database never changes the game outcome.
+- A message can carry only one keyboard, so a completed round uses the inline share
+  keyboard instead of the reply command keyboard.
+- In a group, `TelegramBot` reads the player's chat points and the chat leaderboard
+  before the write and the leaderboard again after it, then posts at most one
+  milestone. The before read is skipped in private chats and when scores are disabled.
 - An `onText` trigger replies with a short hint when an idle private chat sends plain
   text. It skips commands, chats where a game holds the lock, and group chats, because
   tgbotapi delivers each update to every trigger.
+- An `onAnyInlineQuery` trigger answers with one or two article results. The query only
+  selects a variant; the cards always point at the bot and its share sheet. Telegram
+  sends inline queries only after the owner enables inline mode in BotFather.
 
 ## Domain model
 
