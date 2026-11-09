@@ -27,9 +27,16 @@ jobs:
 
           short_description='Play Rock–Paper–Scissors or Rock–Paper–Scissors–Lizard–Spock. Keep score and climb the leaderboard.'
           description='A small Telegram bot that plays Rock–Paper–Scissors and the extended Rock–Paper–Scissors–Lizard–Spock variant against you. Every round shows both moves and the winning relation. Play solo or in a group, then use /stats, /leaderboard, and /chat_leaderboard to track wins and climb the rankings. Open source (MIT), written in Kotlin with Ktor and tgbotapi.'
+          bot_name='Rock Paper Scissors Lizard Spock'
 
           jq -n --arg text "$short_description" '{short_description: $text}' > short-description.json
           jq -n --arg text "$description" '{description: $text}' > description.json
+          jq -n --arg name "$bot_name" '{name: $name}' > name.json
+
+          echo "### setMyName"
+          curl -sS -X POST "${api}/setMyName" \
+            -H 'Content-Type: application/json' --data-binary @name.json |
+            jq -c '{ok, error_code, description: .description}'
 
           cat > commands.json <<'JSON'
           {"commands":[
@@ -61,6 +68,7 @@ jobs:
             jq -c '{ok, error_code, description: .description}'
 
           echo "### verify"
+          curl -sS "${api}/getMyName" | jq -c '{ok, result}'
           curl -sS "${api}/getMyShortDescription" | jq -c '{ok, result}'
           curl -sS "${api}/getMyDescription" | jq -c '{ok, result}'
           curl -sS "${api}/getMyCommands" | jq -c '{ok, result}'
