@@ -10,8 +10,8 @@ in `build.gradle.kts` is the source of truth for releases.
 
 ### Added
 
-- A dispatch-only `configure-bot-metadata.yml` workflow that applies the BotFather short
-  description, description, and `/` command menu through the Bot API.
+- A dispatch-only `configure-bot-metadata.yml` workflow that applies the bot display name,
+  short description, description, and `/` command menu through the Bot API.
 - Optional PostgreSQL score tracking with `/stats`, `/leaderboard`, and
   `/chat_leaderboard`. Wins are worth one point; ties and losses are worth zero.
 - HikariCP + PostgreSQL JDBC in production, H2 in PostgreSQL mode for repository tests,

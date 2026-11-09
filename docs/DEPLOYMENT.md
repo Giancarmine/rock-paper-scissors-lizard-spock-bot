@@ -126,8 +126,8 @@ gh run watch
 
 ### 6. Bot profile and command menu
 
-The bot's storefront — the short description, the full description, and the `/` command
-menu — is applied through the Bot API by a dispatch-only workflow:
+The bot's storefront — the display name, the short description, the full description,
+and the `/` command menu — is applied through the Bot API by a dispatch-only workflow:
 
 ```bash
 gh workflow run configure-bot-metadata.yml
