@@ -148,6 +148,9 @@ A few settings have no Bot API method and must be changed in
 - `/setuserpic` — upload `docs/assets/bot-icon.png` as the profile picture.
 - `/setjoingroups` — allow or forbid group invites. Groups are already enabled
   (`can_join_groups: true`).
+- `/setinline` — enable inline mode so users can type
+  `@RockPaperScissorsLizardSpockBot` in any chat. The bot already answers inline
+  queries; Telegram withholds them until this is enabled.
 
 The add-to-group link needs no BotFather step: use
 `https://t.me/RockPaperScissorsLizardSpockBot?startgroup=true`. The README links to it.

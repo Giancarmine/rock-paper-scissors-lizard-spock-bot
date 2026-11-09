@@ -16,6 +16,9 @@ in `build.gradle.kts` is the source of truth for releases.
 - Growth loops: the command menu is synchronized at startup, a completed round offers a
   Telegram share button, adding the bot to a group posts a short welcome, and `/start`
   deep links are attributed and answered with a share-specific greeting.
+- Group milestone announcements for a new chat leader or a round point total.
+- Inline mode: `@RockPaperScissorsLizardSpockBot` returns Play and Share cards for the
+  classic and five-move games (requires `/setinline` in BotFather).
 - Optional PostgreSQL score tracking with `/stats`, `/leaderboard`, and
   `/chat_leaderboard`. Wins are worth one point; ties and losses are worth zero.
 - HikariCP + PostgreSQL JDBC in production, H2 in PostgreSQL mode for repository tests,

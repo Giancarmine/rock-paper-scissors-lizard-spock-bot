@@ -5,14 +5,19 @@ package com.el_giancar.infrastructure.telegram
 import com.el_giancar.application.ChatLocks
 import com.el_giancar.application.Game
 import com.el_giancar.application.ReadinessState
+import com.el_giancar.application.StatsResult
 import com.el_giancar.application.StatsService
 import com.el_giancar.domain.ClassicMoveType
 import com.el_giancar.domain.GameOutcome
+import com.el_giancar.domain.LeaderboardEntry
 import com.el_giancar.domain.SheldonMoveType
+import dev.inmo.tgbotapi.extensions.api.answers.answerInlineQuery
 import dev.inmo.tgbotapi.extensions.api.bot.getMe
 import dev.inmo.tgbotapi.extensions.api.send.sendMessage
 import dev.inmo.tgbotapi.extensions.api.telegramBot
+import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
 import dev.inmo.tgbotapi.extensions.behaviour_builder.buildBehaviourWithLongPolling
+import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onAnyInlineQuery
 import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onCommand
 import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onMyChatMemberUpdated
 import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onText
@@ -105,13 +110,13 @@ suspend fun runTelegramBot(
 
                     onCommand("classic_game") { message ->
                         gameFlow.play(this, message, classicGame)?.let { result ->
-                            recordResult(message, result.outcome, statsService)
+                            recordResult(this, message, result.outcome, statsService)
                         }
                     }
 
                     onCommand("sheldon_game") { message ->
                         gameFlow.play(this, message, sheldonGame)?.let { result ->
-                            recordResult(message, result.outcome, statsService)
+                            recordResult(this, message, result.outcome, statsService)
                         }
                     }
 
@@ -196,6 +201,22 @@ suspend fun runTelegramBot(
                     onUnhandledCommand { message ->
                         replyTo(message, unknownCommandMessage, unhandledCommandKeyboard())
                     }
+
+                    onAnyInlineQuery { query ->
+                        // Inline mode needs no state: answer with links so a user can
+                        // drop the bot into any chat. A failed answer is logged rather
+                        // than left to fail the update silently.
+                        try {
+                            answerInlineQuery(query, inlineResults(query.query))
+                        } catch (exception: CancellationException) {
+                            throw exception
+                        } catch (exception: Exception) {
+                            logger.warn(
+                                "Could not answer an inline query ({})",
+                                exception.javaClass.simpleName,
+                            )
+                        }
+                    }
                 }.join()
         } finally {
             readiness.markNotReady()
@@ -220,15 +241,77 @@ internal fun shouldHintOnIdleText(
         text.isNotBlank() &&
         !text.trimStart().startsWith("/")
 
+private data class ChatStanding(
+    val points: Int,
+    val leaderboard: List<LeaderboardEntry>,
+)
+
+/**
+ * Reads the player's chat total and the chat leaderboard before a round.
+ *
+ * Returns `null` when scores are disabled or the database is unavailable, so the
+ * caller can record the game without attempting a milestone announcement.
+ */
+private suspend fun StatsService.chatStanding(
+    playerId: Long,
+    chatId: Long,
+): ChatStanding? {
+    val personal = personalStats(playerId, chatId)
+    if (personal !is StatsResult.Success) {
+        return null
+    }
+    val leaderboard = chatLeaderboard(chatId)
+    if (leaderboard !is StatsResult.Success) {
+        return null
+    }
+    return ChatStanding(personal.value.chat.points, leaderboard.value)
+}
+
 private suspend fun recordResult(
+    context: BehaviourContext,
     message: ChatContentMessage<TextContent>,
     outcome: GameOutcome,
     statsService: StatsService,
 ) {
     val player = message.playerOrNull() ?: return
+    val chatId = message.chat.id.chatId.long
+    val inGroup = message.chat is GroupChat
+
+    // Milestones are a group feature: a private score update is already visible in
+    // /stats and does not need an extra message. Read the before state first so a
+    // failed read never skips recording the game itself.
+    val before = if (inGroup) statsService.chatStanding(player.id, chatId) else null
+
     statsService.recordGame(
         player = player,
-        chatId = message.chat.id.chatId.long,
+        chatId = chatId,
         outcome = outcome,
     )
+
+    if (!inGroup || before == null) {
+        return
+    }
+
+    val after = statsService.chatLeaderboard(chatId)
+    if (after !is StatsResult.Success) {
+        return
+    }
+
+    val milestone =
+        detectMilestone(
+            displayName = player.displayName,
+            playerId = player.id,
+            pointsBefore = before.points,
+            wonRound = outcome == GameOutcome.WIN,
+            leaderboardBefore = before.leaderboard,
+            leaderboardAfter = after.value,
+        ) ?: return
+
+    try {
+        context.sendMessage(message.chat.id, milestoneMessage(milestone))
+    } catch (exception: CancellationException) {
+        throw exception
+    } catch (exception: Exception) {
+        logger.warn("Could not announce a milestone ({})", exception.javaClass.simpleName)
+    }
 }

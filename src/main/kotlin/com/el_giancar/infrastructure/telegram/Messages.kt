@@ -150,6 +150,24 @@ internal fun resultMessage(result: RoundResult<*>): String =
         }
     }
 
+/**
+ * The announcement for a score milestone in a group.
+ *
+ * The text keeps the result message's voice: one line of news, one line inviting the
+ * chat to respond.
+ */
+internal fun milestoneMessage(milestone: Milestone): String =
+    when (milestone) {
+        is Milestone.NewLeader ->
+            "🏆 ${milestone.displayName} is now #1 in this chat with ${pointsLabel(milestone.points)}!\n" +
+                "Think you can take the top spot? Play /classic_game or /sheldon_game."
+        is Milestone.Points ->
+            "🎉 ${milestone.displayName} just reached ${pointsLabel(milestone.points)} in this chat!\n" +
+                "Keep it going with /classic_game or /sheldon_game."
+    }
+
+private fun pointsLabel(points: Int): String = "$points ${if (points == 1) "point" else "points"}"
+
 internal val statsDisabledMessage =
     "📊 Score tracking is disabled because the bot has no database configured.\n" +
         "Games still work; leaderboards are unavailable."

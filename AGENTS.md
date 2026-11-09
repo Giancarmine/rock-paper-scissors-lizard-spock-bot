@@ -113,6 +113,8 @@ Application.kt                        main(): reads config, starts Ktor
   └─ infrastructure/telegram/         TelegramBot.kt: command wiring + long polling + readiness monitor
        ├─ GameFlow.kt                 prompt loop, timeout, per-chat lock, returns RoundResult?
        ├─ GameIo.kt                   send/await seam (real + fake implementations)
+       ├─ InlineResults.kt            inline-mode Play/Share cards
+       ├─ Milestones.kt               new-leader and point milestone detection
        ├─ MoveParser.kt               text -> move (case-insensitive)
        ├─ Players.kt                  Telegram user -> Player
        ├─ Messages.kt / Keyboards.kt  user-facing text and keyboards
@@ -146,11 +148,13 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/main/kotlin/com/el_giancar/infrastructure/http/OpenApiRoutes.kt` | `GET /openapi.yaml`; reads the bundled spec once at startup and serves it as `application/yaml`. |
 | `src/main/kotlin/com/el_giancar/infrastructure/logging/ExpectedLongPollTimeoutFilter.kt` | Logback turbo filter that drops only the expected idle `getUpdates` request timeout. |
 | `src/main/kotlin/com/el_giancar/infrastructure/stats/PostgresStatsStore.kt` | HikariCP pool, URL credential extraction, retrying schema bootstrap, writes, personal stats, and leaderboards. |
-| `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Bot wiring: commands, long polling, result recording, group onboarding, `/start` attribution, and the 60-second readiness monitor. |
+| `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Bot wiring: commands, long polling, result recording, group onboarding, milestones, inline queries, `/start` attribution, and the 60-second readiness monitor. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/BotCommands.kt` | The `/` command menu, published at startup so it always matches the deployed code. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/BotLinks.kt` | Public bot URL and the share deep link used by the result keyboard. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameFlow.kt` | Prompt loop, 2-minute timeout, per-chat lock, result rendering, and the completed `RoundResult` (or `null`). |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GroupOnboarding.kt` | Detects the transition that means the bot was added to a group. |
+| `src/main/kotlin/com/el_giancar/infrastructure/telegram/InlineResults.kt` | Builds the inline-mode article results and their Play/Share buttons. |
+| `src/main/kotlin/com/el_giancar/infrastructure/telegram/Milestones.kt` | Pure new-leader and point-milestone detection from before/after leaderboards. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/StartPayload.kt` | Parses and sanitizes `/start` deep-link payloads. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameIo.kt` | `GameIo` seam (send/await text) with the real `TelegramGameIo` implementation, so the flow is unit-testable. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/MoveParser.kt` | Case-insensitive text-to-move parsing. |
@@ -166,11 +170,13 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/test/kotlin/com/el_giancar/infrastructure/logging/LogbackConfigTest.kt` | Verifies that bot tokens are redacted from messages and stack traces. |
 | `src/test/kotlin/com/el_giancar/infrastructure/logging/JulBridgeTest.kt` | Verifies that `java.util.logging` records reach Logback and are redacted. |
 | `src/test/kotlin/com/el_giancar/infrastructure/stats/PostgresStatsStoreTest.kt` | H2-backed repository, leaderboard ranking, display-name updates, and PostgreSQL URL conversion. |
-| `src/test/kotlin/com/el_giancar/infrastructure/telegram/GameFlowTest.kt` | Prompt, retry, cancellation, timeout and busy-chat flow tests through a fake `GameIo`, including the returned result. |
+| `src/test/kotlin/com/el_giancar/infrastructure/telegram/GameFlowTest.kt` | Prompt, retry, cancellation, timeout and busy-chat flow tests through a fake `GameIo`, including the returned result and share keyboard. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/IdleTextTest.kt` | Verifies the idle-text hint predicate: commands, blank text, busy chats and group chats are excluded. |
+| `src/test/kotlin/com/el_giancar/infrastructure/telegram/InlineResultsTest.kt` | Inline-mode query filtering, result text, and Play/Share buttons. |
+| `src/test/kotlin/com/el_giancar/infrastructure/telegram/MilestonesTest.kt` | New-leader and point-milestone detection, including priority and zero-point guards. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/MoveParserTest.kt` | Case-insensitive parsing and per-game move validation. |
 | `src/test/kotlin/com/el_giancar/infrastructure/telegram/PlayersTest.kt` | Display-name fallbacks and truncation. |
-| `src/test/kotlin/com/el_giancar/infrastructure/telegram/MessagesTest.kt` | Exact win/tie wording, both moves, prompt contents, and stats/leaderboard formatting. |
+| `src/test/kotlin/com/el_giancar/infrastructure/telegram/MessagesTest.kt` | Exact win/tie wording, both moves, prompt contents, milestone text, and stats/leaderboard formatting. |
 | `src/main/resources/logback.xml` | Console logging at `info`, bot-token redaction, and the idle-timeout filter. |
 | `src/main/resources/openapi/documentation.yaml` | Documents `/healthz`, `/readyz`, and `/openapi.yaml`; served by `OpenApiRoutes.kt`. |
 | `Dockerfile`, `.dockerignore` | Two-stage JDK 21 build, fat jar runtime. |
@@ -201,10 +207,13 @@ Application.kt                        main(): reads config, starts Ktor
    any command cancels the game. A timeout releases the lock with a clear message.
 5. The game service resolves the round and returns a typed `RoundResult`.
 6. `Messages.resultMessage(...)` renders both moves and the outcome; the bot sends it
-   together with the commands keyboard in a single message.
+   with the inline share keyboard in a single message (a message cannot carry both a
+   reply keyboard and an inline keyboard).
 7. `GameFlow.play` returns the `RoundResult` for a completed round, or `null` for a
    busy chat, timeout, cancellation, or too many invalid attempts. Only non-null
-   results are recorded through `StatsService`, after the reply is sent.
+   results are recorded through `StatsService`, after the reply is sent. In a group,
+   the bot reads the player's chat points and the chat leaderboard before and after the
+   write and announces at most one milestone: a new leader or an exact point total.
 8. `/start`, `/rules`, `/help`, `/about`, `/commands`, `/stats`, `/leaderboard`, and
    `/chat_leaderboard` reply directly; `/start` also reads a deep-link payload, logs a
    sanitized campaign token, and uses the share-specific greeting for `?start=share`.
@@ -216,6 +225,10 @@ Application.kt                        main(): reads config, starts Ktor
 10. `onMyChatMemberUpdated` posts the group welcome when the bot transitions from
     `Left`/`Kicked` to `Member`/`Administrator`/`Creator` in a group. Promotions and
     private-chat membership changes are ignored.
+11. `onAnyInlineQuery` answers with one or two `InlineQueryResultArticle`s. The query
+    only selects a variant (`classic`, or `lizard`/`spock`/`sheldon`); the cards always
+    link to the same bot and share URLs. Telegram sends inline queries only after the
+    owner enables inline mode in BotFather with `/setinline`.
 
 Game state is still in memory: the only shared live state is the per-chat mutex map.
 Completed rounds are the exception — they are written to PostgreSQL when

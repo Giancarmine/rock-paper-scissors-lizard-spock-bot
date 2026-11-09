@@ -72,6 +72,20 @@ internal fun shareKeyboard(): InlineKeyboardMarkup =
     }
 
 /**
+ * The buttons attached to an inline-mode result.
+ *
+ * The result can be posted in any chat, so the Play button opens the bot while the
+ * Share button keeps the loop going.
+ */
+internal fun inlinePlayKeyboard(): InlineKeyboardMarkup =
+    inlineKeyboard {
+        row {
+            +urlInlineButton("▶️ Play", BOT_URL)
+            +urlInlineButton("📣 Share", shareUrl())
+        }
+    }
+
+/**
  * Builds a Telegram share-sheet link for the bot.
  *
  * Spaces are encoded as `%20` rather than `+` so the text renders correctly in every
