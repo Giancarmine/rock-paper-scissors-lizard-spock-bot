@@ -34,6 +34,8 @@ Docker image.
 - Without `DATABASE_URL`, games still work and the stats commands explain that
   tracking is disabled.
 - Uses Telegram long polling, so no public URL or webhook is required.
+- A share button on every completed round, group onboarding, and `/start` deep-link
+  attribution for share campaigns.
 
 ## Commands
 
@@ -239,12 +241,16 @@ src/main/kotlin/com/el_giancar/
     │   └── PostgresStatsStore.kt      # HikariCP + schema + queries
     └── telegram/
         ├── TelegramBot.kt             # command wiring + readiness monitor
+        ├── BotCommands.kt             # startup `/` command-menu sync
+        ├── BotLinks.kt                # public bot and share links
         ├── GameFlow.kt                # prompt, timeout, lock, result
         ├── GameIo.kt                  # send/await seam for flow tests
+        ├── GroupOnboarding.kt         # add-to-group detection
         ├── MoveParser.kt              # text -> move
         ├── Players.kt                 # Telegram user -> Player
         ├── Replies.kt                 # shared reply helpers
-        ├── Keyboards.kt               # reply keyboards
+        ├── StartPayload.kt            # /start deep-link attribution
+        ├── Keyboards.kt               # reply and share keyboards
         └── Messages.kt                # user-facing text
 src/main/resources/
 ├── logback.xml

@@ -155,6 +155,21 @@ class MessagesTest {
     }
 
     @Test
+    fun `uses a share-specific greeting for the share deep link`() {
+        assertEquals(shareStartMessage, startMessageFor("share"))
+        assertEquals(shareStartMessage, startMessageFor("SHARE"))
+        assertEquals(startMessage, startMessageFor(null))
+        assertEquals(startMessage, startMessageFor("unknown"))
+    }
+
+    @Test
+    fun `group welcome points at the group commands`() {
+        assertTrue(groupWelcomeMessage.contains("/classic_game"), groupWelcomeMessage)
+        assertTrue(groupWelcomeMessage.contains("/sheldon_game"), groupWelcomeMessage)
+        assertTrue(groupWelcomeMessage.contains("/chat_leaderboard"), groupWelcomeMessage)
+    }
+
+    @Test
     fun `formats personal stats for this chat and overall`() {
         val stats =
             PersonalStats(

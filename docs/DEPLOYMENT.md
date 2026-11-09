@@ -126,8 +126,8 @@ gh run watch
 
 ### 6. Bot profile and command menu
 
-The bot's storefront — the display name, the short description, the full description,
-and the `/` command menu — is applied through the Bot API by a dispatch-only workflow:
+The bot's storefront — the display name, the short description, and the full
+description — is applied through the Bot API by a dispatch-only workflow:
 
 ```bash
 gh workflow run configure-bot-metadata.yml
@@ -136,7 +136,11 @@ gh run watch
 
 It reads `BOT_TOKEN` from the repository secrets, prints only the sanitized API
 responses, and is safe to re-run after a copy change. The text lives in
-`.github/workflows/configure-bot-metadata.yml`; keep it in sync with `Messages.kt`.
+`.github/workflows/configure-bot-metadata.yml`.
+
+The `/` command menu is not part of that workflow. The bot registers it at startup
+from `BotCommands.kt`, so the menu always matches the deployed code; no manual step is
+needed after adding or renaming a command.
 
 A few settings have no Bot API method and must be changed in
 [@BotFather](https://t.me/BotFather):

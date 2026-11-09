@@ -20,6 +20,34 @@ internal val startMessage =
     |Track your score with /stats and see who leads with /leaderboard.
     """.trimMargin()
 
+internal val shareStartMessage =
+    """
+    |👋 Welcome — someone shared this bot with you!
+    |
+    |I play Rock–Paper–Scissors and Rock–Paper–Scissors–Lizard–Spock against you.
+    |
+    |Pick a game below, or send /help for the full command list.
+    |Track your score with /stats and see who leads with /leaderboard.
+    """.trimMargin()
+
+/**
+ * The greeting for a `/start` deep link. Unknown payloads fall back to the normal
+ * welcome so a crafted link cannot produce an empty or misleading reply.
+ */
+internal fun startMessageFor(payload: String?): String =
+    when (payload?.lowercase()) {
+        "share" -> shareStartMessage
+        else -> startMessage
+    }
+
+internal val groupWelcomeMessage =
+    """
+    |👋 Thanks for adding me! I play Rock–Paper–Scissors and Rock–Paper–Scissors–Lizard–Spock right here in the chat.
+    |
+    |Start a round with /classic_game or /sheldon_game. Each game belongs to the person who starts it, so everyone can play.
+    |Keep score with /stats and see who leads with /chat_leaderboard.
+    """.trimMargin()
+
 internal val rulesMessage =
     """
     |🧠 Rock–Paper–Scissors–Lizard–Spock

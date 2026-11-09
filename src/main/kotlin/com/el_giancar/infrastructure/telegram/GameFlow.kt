@@ -5,6 +5,7 @@ import com.el_giancar.application.Game
 import com.el_giancar.domain.Move
 import com.el_giancar.domain.RoundResult
 import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
+import dev.inmo.tgbotapi.types.buttons.KeyboardMarkup
 import dev.inmo.tgbotapi.types.message.content.TextMessage
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration
@@ -19,6 +20,7 @@ import kotlin.time.Duration.Companion.minutes
  */
 internal class GameFlow(
     private val chatLocks: ChatLocks,
+    private val resultKeyboard: () -> KeyboardMarkup? = { shareKeyboard() },
     private val gameTimeout: Duration = 2.minutes,
     private val maxMoveAttempts: Int = 3,
     private val ioFor: (BehaviourContext, TextMessage) -> GameIo = { context, message ->
@@ -70,7 +72,7 @@ internal class GameFlow(
                 else -> {
                     val move = requireNotNull(attempt.move) { "A selected attempt must carry a move" }
                     val result = game.play(move)
-                    io.send(resultMessage(result), commandsKeyboard())
+                    io.send(resultMessage(result), resultKeyboard())
                     result
                 }
             }
