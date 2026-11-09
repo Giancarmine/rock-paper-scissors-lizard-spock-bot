@@ -116,6 +116,14 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the rotation runbook.
   `/healthz` returned `200`, `/readyz` returned `200 READY`, and `/openapi.yaml`
   returned `200`. The `configure-bot-metadata.yml` workflow now owns only the profile
   text, and `getMyCommands` still returns the nine-command menu registered at startup.
+- Render deploy `dep-dbougnhsrm7s73d546c0` (commit `822b169`, group milestones and
+  inline mode) reached **Live** at 15:38 UTC on 2026-11-09. Startup logged
+  `Synchronized 9 commands with Telegram` and `Score tracking is enabled.`,
+  `/healthz` returned `200`, `/readyz` returned `200 READY`, and `/openapi.yaml`
+  returned `200`. The metadata workflow re-ran cleanly and `getMyCommands` still
+  returns the nine-command menu. Inline mode still needs the owner's one-time
+  `/setinline` in BotFather, and group milestone announcements are pending a check in
+  a real group.
 - Runtime verification of the Telegram path: the Render logs show
   `Connected to Telegram as @RockPaperScissorsLizardSpockBot`, and `/readyz` returned
   `READY`. The owner also completed an interactive game and the stats commands.
