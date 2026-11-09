@@ -146,8 +146,12 @@ Application.kt                        main(): reads config, starts Ktor
 | `src/main/kotlin/com/el_giancar/infrastructure/http/OpenApiRoutes.kt` | `GET /openapi.yaml`; reads the bundled spec once at startup and serves it as `application/yaml`. |
 | `src/main/kotlin/com/el_giancar/infrastructure/logging/ExpectedLongPollTimeoutFilter.kt` | Logback turbo filter that drops only the expected idle `getUpdates` request timeout. |
 | `src/main/kotlin/com/el_giancar/infrastructure/stats/PostgresStatsStore.kt` | HikariCP pool, URL credential extraction, retrying schema bootstrap, writes, personal stats, and leaderboards. |
-| `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Bot wiring: commands, long polling, result recording, and the 60-second readiness monitor. |
+| `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt` | Bot wiring: commands, long polling, result recording, group onboarding, `/start` attribution, and the 60-second readiness monitor. |
+| `src/main/kotlin/com/el_giancar/infrastructure/telegram/BotCommands.kt` | The `/` command menu, published at startup so it always matches the deployed code. |
+| `src/main/kotlin/com/el_giancar/infrastructure/telegram/BotLinks.kt` | Public bot URL and the share deep link used by the result keyboard. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameFlow.kt` | Prompt loop, 2-minute timeout, per-chat lock, result rendering, and the completed `RoundResult` (or `null`). |
+| `src/main/kotlin/com/el_giancar/infrastructure/telegram/GroupOnboarding.kt` | Detects the transition that means the bot was added to a group. |
+| `src/main/kotlin/com/el_giancar/infrastructure/telegram/StartPayload.kt` | Parses and sanitizes `/start` deep-link payloads. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/GameIo.kt` | `GameIo` seam (send/await text) with the real `TelegramGameIo` implementation, so the flow is unit-testable. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/MoveParser.kt` | Case-insensitive text-to-move parsing. |
 | `src/main/kotlin/com/el_giancar/infrastructure/telegram/Players.kt` | Telegram `CommonUser` to `Player`, with display-name fallbacks. |
@@ -202,11 +206,16 @@ Application.kt                        main(): reads config, starts Ktor
    busy chat, timeout, cancellation, or too many invalid attempts. Only non-null
    results are recorded through `StatsService`, after the reply is sent.
 8. `/start`, `/rules`, `/help`, `/about`, `/commands`, `/stats`, `/leaderboard`, and
-   `/chat_leaderboard` reply directly; `/cancel` reports that no game is running when
-   the chat is idle (during a game the `GameFlow` prompt already consumes it as a
-   cancellation); unknown commands get a hint via `onUnhandledCommand`.
+   `/chat_leaderboard` reply directly; `/start` also reads a deep-link payload, logs a
+   sanitized campaign token, and uses the share-specific greeting for `?start=share`.
+   `/cancel` reports that no game is running when the chat is idle (during a game the
+   `GameFlow` prompt already consumes it as a cancellation); unknown commands get a
+   hint via `onUnhandledCommand`.
 9. `onText` gives an idle private chat a hint when it receives plain text. It stays
    silent for commands, for chats where a game holds the lock, and for group chats.
+10. `onMyChatMemberUpdated` posts the group welcome when the bot transitions from
+    `Left`/`Kicked` to `Member`/`Administrator`/`Creator` in a group. Promotions and
+    private-chat membership changes are ignored.
 
 Game state is still in memory: the only shared live state is the per-chat mutex map.
 Completed rounds are the exception — they are written to PostgreSQL when
@@ -319,10 +328,11 @@ derived by looking up the pair in the opposite order.
 
 1. Register it in `src/main/kotlin/com/el_giancar/infrastructure/telegram/TelegramBot.kt`
    with `onCommand("name") { message -> ... }`.
-2. Add a `simpleButton("/name")` to `commandsKeyboard()` in `Keyboards.kt` if it should
+2. Add it to `botCommands` in `BotCommands.kt` so it appears in Telegram's `/` menu.
+3. Add a `simpleButton("/name")` to `commandsKeyboard()` in `Keyboards.kt` if it should
    be discoverable.
-3. Add it to `helpMessage` in `Messages.kt` and to `README.md`.
-4. Keep the reply style consistent with the existing messages: friendly, concise,
+4. Add it to `helpMessage` in `Messages.kt` and to `README.md`.
+5. Keep the reply style consistent with the existing messages: friendly, concise,
    emoji-led where useful, and plain text (no Markdown parse mode).
 
 ### Add or change a move / rule

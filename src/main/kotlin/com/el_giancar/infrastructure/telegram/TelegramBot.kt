@@ -10,11 +10,14 @@ import com.el_giancar.domain.ClassicMoveType
 import com.el_giancar.domain.GameOutcome
 import com.el_giancar.domain.SheldonMoveType
 import dev.inmo.tgbotapi.extensions.api.bot.getMe
+import dev.inmo.tgbotapi.extensions.api.send.sendMessage
 import dev.inmo.tgbotapi.extensions.api.telegramBot
 import dev.inmo.tgbotapi.extensions.behaviour_builder.buildBehaviourWithLongPolling
 import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onCommand
+import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onMyChatMemberUpdated
 import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onText
 import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onUnhandledCommand
+import dev.inmo.tgbotapi.types.chat.GroupChat
 import dev.inmo.tgbotapi.types.chat.PrivateChat
 import dev.inmo.tgbotapi.types.message.abstracts.ChatContentMessage
 import dev.inmo.tgbotapi.types.message.content.TextContent
@@ -78,9 +81,14 @@ suspend fun runTelegramBot(
                     val me = bot.getMe()
                     readiness.markReady()
                     logger.info("Connected to Telegram as {}", me.username)
+                    bot.syncCommands()
 
-                    onCommand("start") { message ->
-                        replyTo(message, startMessage, commandsKeyboard())
+                    onCommand("start", requireOnlyCommandInMessage = false) { message ->
+                        val payload = startPayload(message.content.text)
+                        sanitizedCampaign(payload)?.let { campaign ->
+                            logger.info("Start campaign: {}", campaign)
+                        }
+                        replyTo(message, startMessageFor(payload), commandsKeyboard())
                     }
 
                     onCommand("rules") { message ->
@@ -152,6 +160,20 @@ suspend fun runTelegramBot(
                         // cancel instead of falling through to the unknown-command hint.
                         if (!chatLocks.isBusy(message.chat.id.chatId.long)) {
                             replyTo(message, noActiveGameMessage, commandsKeyboard())
+                        }
+                    }
+
+                    onMyChatMemberUpdated { update ->
+                        // Private chats also emit membership updates (for example when
+                        // the user blocks the bot), so only welcome real groups.
+                        if (
+                            update.chat is GroupChat &&
+                            isBotAddedToChat(
+                                oldStatus = update.oldChatMemberState.status,
+                                newStatus = update.newChatMemberState.status,
+                            )
+                        ) {
+                            sendMessage(update.chat.id, groupWelcomeMessage)
                         }
                     }
 

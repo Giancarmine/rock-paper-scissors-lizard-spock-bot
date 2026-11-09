@@ -1,8 +1,9 @@
 name: Configure bot metadata
 
-# Applies the BotFather profile text and the command menu through the Bot API so the
-# bot's storefront stays in sync with the repo. The token comes from the BOT_TOKEN
-# secret and is never printed; GitHub masks it in logs.
+# Applies the bot's profile text through the Bot API so the storefront stays in sync
+# with the repo. The `/` command menu is registered by the bot itself at startup
+# (see BotCommands.kt), so this workflow does not touch it. The token comes from the
+# BOT_TOKEN secret and is never printed; GitHub masks it in logs.
 
 on:
   workflow_dispatch:
@@ -14,7 +15,7 @@ jobs:
   configure:
     runs-on: ubuntu-latest
     steps:
-      - name: Apply profile text and command menu
+      - name: Apply profile text
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
@@ -38,20 +39,6 @@ jobs:
             -H 'Content-Type: application/json' --data-binary @name.json |
             jq -c '{ok, error_code, description: .description}'
 
-          cat > commands.json <<'JSON'
-          {"commands":[
-            {"command":"start","description":"Start the bot and show the keyboard"},
-            {"command":"classic_game","description":"Play Rock, Paper, Scissors"},
-            {"command":"sheldon_game","description":"Play the 5-move variant"},
-            {"command":"rules","description":"Show the rules"},
-            {"command":"stats","description":"Your score"},
-            {"command":"leaderboard","description":"Global top 10"},
-            {"command":"chat_leaderboard","description":"Top 10 in this chat"},
-            {"command":"help","description":"List the commands"},
-            {"command":"about","description":"About the bot and its source"}
-          ]}
-          JSON
-
           echo "### setMyShortDescription"
           curl -sS -X POST "${api}/setMyShortDescription" \
             -H 'Content-Type: application/json' --data-binary @short-description.json |
@@ -60,11 +47,6 @@ jobs:
           echo "### setMyDescription"
           curl -sS -X POST "${api}/setMyDescription" \
             -H 'Content-Type: application/json' --data-binary @description.json |
-            jq -c '{ok, error_code, description: .description}'
-
-          echo "### setMyCommands"
-          curl -sS -X POST "${api}/setMyCommands" \
-            -H 'Content-Type: application/json' --data-binary @commands.json |
             jq -c '{ok, error_code, description: .description}'
 
           echo "### verify"

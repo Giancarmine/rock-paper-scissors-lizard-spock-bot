@@ -5,12 +5,14 @@ import com.el_giancar.application.Game
 import com.el_giancar.domain.ClassicMoveType
 import com.el_giancar.domain.GameOutcome
 import com.el_giancar.domain.RoundResult
+import dev.inmo.tgbotapi.types.buttons.InlineKeyboardMarkup
 import dev.inmo.tgbotapi.types.buttons.KeyboardMarkup
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
@@ -115,6 +117,28 @@ class GameFlowTest {
 
             assertFalse(chatLocks.isBusy(9L))
         }
+
+    @Test
+    fun `attaches the share keyboard to a completed round`() =
+        runBlocking {
+            val io = FakeGameIo("Rock")
+
+            GameFlow(ChatLocks()).play(chatId = 1L, game = game, io = io)
+
+            assertIs<InlineKeyboardMarkup>(io.keyboards.last())
+        }
+
+    @Test
+    fun `uses the configured result keyboard`() =
+        runBlocking {
+            val resultKeyboard = commandsKeyboard()
+            val io = FakeGameIo("Rock")
+
+            GameFlow(ChatLocks(), resultKeyboard = { resultKeyboard })
+                .play(chatId = 1L, game = game, io = io)
+
+            assertEquals(resultKeyboard, io.keyboards.last())
+        }
 }
 
 private class FakeGameIo(
@@ -122,12 +146,14 @@ private class FakeGameIo(
 ) : GameIo {
     private val pending = ArrayDeque(inputs.toList())
     val sent = mutableListOf<String>()
+    val keyboards = mutableListOf<KeyboardMarkup?>()
 
     override suspend fun send(
         text: String,
         keyboard: KeyboardMarkup?,
     ) {
         sent += text
+        keyboards += keyboard
     }
 
     override suspend fun awaitText(): String = pending.removeFirstOrNull() ?: awaitCancellation()
