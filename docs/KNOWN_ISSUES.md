@@ -106,6 +106,10 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the rotation runbook.
   `/healthz` returned `200`, `/readyz` returned `200 READY`, and `/openapi.yaml`
   returned `200`. The owner then played a round against the deployed bot and confirmed
   that the statistics path works.
+- Render deploy `dep-dbot8u3rjlhs73c80k0g` (commit `cdf5594`, group-move attribution
+  and retrying stats initialization) reached **Live** at 14:13 UTC on 2026-11-09.
+  Startup logged `Score tracking is enabled.`, `/healthz` returned `200`, `/readyz`
+  returned `200 READY`, and `/openapi.yaml` returned `200`.
 - Runtime verification of the Telegram path: the Render logs show
   `Connected to Telegram as @RockPaperScissorsLizardSpockBot`, and `/readyz` returned
   `READY`. The owner also completed an interactive game and the stats commands.
