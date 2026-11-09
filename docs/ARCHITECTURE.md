@@ -226,10 +226,10 @@ occupied places.
 - Sending a command while a game is pending cancels the game and releases the lock.
 - A game with no move for two minutes times out, tells the user, and releases the lock.
 - A second game in the same chat is rejected without disturbing the first.
-- A missing `DATABASE_URL` disables scores. A database that fails at startup leaves
-  scores disabled for that process; a database that fails later makes the stats
-  commands report `Unavailable`. Neither case changes gameplay. Startup logs only the
-  exception type, never the connection URL or credentials.
+- A missing `DATABASE_URL` disables scores. A database that is asleep or unreachable
+  at startup is retried on the first operation, and one that fails later makes the
+  stats commands report `Unavailable`. Neither case changes gameplay. Startup logs
+  only the exception type, never the connection URL or credentials.
 - Telegram/network failures still propagate to the handler coroutine; there is no
   retry/backoff layer.
 
@@ -263,7 +263,8 @@ Notes:
   is never a build argument and is never baked into the image. Optional database
   credentials follow the same path and are only written when the corresponding GitHub
   secret is set.
-- The bot creates the score schema on startup when `DATABASE_URL` is present. Without
+- The bot creates the score schema on startup when `DATABASE_URL` is present and
+  retries initialization on the first operation if the database is not ready. Without
   it, the service starts normally with score tracking disabled.
 - CI (`.github/workflows/ci.yml`) lints, builds, and tests every push/PR. The deploy
   workflow (`.github/workflows/deploy-render.yml`) runs on `v*` tags or manual dispatch.

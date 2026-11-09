@@ -129,9 +129,11 @@ export DATABASE_URL="postgresql://user:password@host/db?sslmode=require"  # opti
   (`postgresql://user:password@host/db?...`); credentials embedded in the URL are
   moved out of the JDBC URL before the pool is created. `DATABASE_USER` and
   `DATABASE_PASSWORD` are optional overrides.
-- If the database is unset or unreachable, gameplay is unaffected. Startup logs a
-  warning without printing the URL or credentials, and the stats commands reply with
-  a disabled/unavailable message.
+- If the database is unset, gameplay is unaffected and the stats commands reply with
+  a disabled message. If it is unreachable, gameplay still works and the stats
+  commands report that tracking is temporarily unavailable. A database that is asleep
+  or unreachable at startup is retried on the first game or stats request, so a
+  redeploy is not required. Logs never print the URL or credentials.
 
 ### Run locally
 

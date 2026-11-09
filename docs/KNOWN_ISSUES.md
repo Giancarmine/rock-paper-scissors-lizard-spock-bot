@@ -32,6 +32,7 @@ is both a changelog of the review and a list of what still needs owner action.
 | 23 | Tooling | Kotlin formatting was enforced only by convention, so style drift could land unnoticed | Adopted the ktlint Gradle plugin 14.2.0, added `ktlintCheck` to CI, disabled only `standard:package-name` for the intentional `com.el_giancar` underscore, and applied the formatter to the existing sources. |
 | 24 | Features / persistence | Every round was independent, so players could not see scores or compete across chats | Added optional PostgreSQL score tracking: `/stats`, `/leaderboard`, and `/chat_leaderboard`, one `players` row plus per-chat aggregates, automatic schema creation, and H2-backed repository tests. A missing or unreachable database leaves gameplay unchanged and the commands explain that tracking is disabled or unavailable. Credentials embedded in `DATABASE_URL` are moved out of the JDBC URL before the pool is created. |
 | 25 | Correctness | In a group chat, any member's text could satisfy another player's prompt, and the round was credited to the command author | `TelegramGameIo` accepts text only from the chat and user that started the game; `isMoveFromOriginatingPlayer` and `GameIoTest` cover the filter. |
+| 26 | Availability | A database that was asleep or unreachable at startup left scores disabled until the next restart | The store is kept and schema initialization is retried on the first operation; connection, login, and socket timeouts were raised to cover a Neon cold start. |
 
 ## Security status
 

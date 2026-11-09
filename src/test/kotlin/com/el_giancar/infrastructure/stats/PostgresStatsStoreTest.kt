@@ -136,6 +136,40 @@ class PostgresStatsStoreTest {
         }
 
     @Test
+    fun `initializes the schema on the first operation`() =
+        runBlocking {
+            val store =
+                PostgresStatsStore.create(
+                    rawUrl = "jdbc:h2:mem:${UUID.randomUUID()};MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE",
+                )
+            try {
+                val empty = store.personalStats(playerId = 1L, chatId = 10L)
+                assertEquals(0, empty.overall.games)
+
+                store.recordGame(GameRecord(Player(1L, "Alice"), chatId = 10L, outcome = GameOutcome.WIN))
+
+                val stats = store.personalStats(playerId = 1L, chatId = 10L)
+                assertEquals(1, stats.chat.games)
+                assertEquals(1, stats.chat.points)
+            } finally {
+                store.close()
+            }
+        }
+
+    @Test
+    fun `initialization is idempotent`() =
+        runBlocking {
+            withStore { store ->
+                store.initialize()
+                store.initialize()
+
+                store.recordGame(GameRecord(Player(1L, "Alice"), chatId = 10L, outcome = GameOutcome.WIN))
+
+                assertEquals(1, store.personalStats(playerId = 1L, chatId = 10L).overall.games)
+            }
+        }
+
+    @Test
     fun `converts hosted PostgreSQL URLs into JDBC settings`() {
         val settings =
             jdbcSettings(
