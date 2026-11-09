@@ -110,6 +110,12 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the rotation runbook.
   and retrying stats initialization) reached **Live** at 14:13 UTC on 2026-11-09.
   Startup logged `Score tracking is enabled.`, `/healthz` returned `200`, `/readyz`
   returned `200 READY`, and `/openapi.yaml` returned `200`.
+- Render deploy `dep-dbouai3ncjis73a1b5bg` (commit `c2ca32c`, the first growth loops)
+  reached **Live** at 15:25 UTC on 2026-11-09. Startup logged
+  `Synchronized 9 commands with Telegram` and `Score tracking is enabled.`,
+  `/healthz` returned `200`, `/readyz` returned `200 READY`, and `/openapi.yaml`
+  returned `200`. The `configure-bot-metadata.yml` workflow now owns only the profile
+  text, and `getMyCommands` still returns the nine-command menu registered at startup.
 - Runtime verification of the Telegram path: the Render logs show
   `Connected to Telegram as @RockPaperScissorsLizardSpockBot`, and `/readyz` returned
   `READY`. The owner also completed an interactive game and the stats commands.
