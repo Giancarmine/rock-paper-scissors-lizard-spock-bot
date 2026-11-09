@@ -1,5 +1,7 @@
 # Rock–Paper–Scissors–Lizard–Spock Bot
 
+[**▶ Play on Telegram**](https://t.me/RockPaperScissorsLizardSpockBot) — no install, works in private chats and groups.
+
 [![CI](https://github.com/Giancarmine/rock-paper-scissors-lizard-spock-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/Giancarmine/rock-paper-scissors-lizard-spock-bot/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.4.21-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)

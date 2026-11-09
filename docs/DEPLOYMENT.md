@@ -124,6 +124,27 @@ gh run list --workflow=deploy-render.yml
 gh run watch
 ```
 
+### 6. Bot profile and command menu
+
+The bot's storefront — the short description, the full description, and the `/` command
+menu — is applied through the Bot API by a dispatch-only workflow:
+
+```bash
+gh workflow run configure-bot-metadata.yml
+gh run watch
+```
+
+It reads `BOT_TOKEN` from the repository secrets, prints only the sanitized API
+responses, and is safe to re-run after a copy change. The text lives in
+`.github/workflows/configure-bot-metadata.yml`; keep it in sync with `Messages.kt`.
+
+A few settings have no Bot API method and must be changed in
+[@BotFather](https://t.me/BotFather):
+
+- `/setuserpic` — profile picture.
+- `/setjoingroups` — allow or forbid group invites (groups are enabled today).
+- **Add to Group** — the one-tap invite link.
+
 ## Staying on the free plan
 
 The service runs on Render's **free** plan. Free web services stop after 15 minutes
