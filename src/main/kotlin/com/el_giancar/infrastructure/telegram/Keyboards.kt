@@ -61,8 +61,9 @@ internal fun unhandledCommandKeyboard(): ReplyKeyboardMarkup =
 /**
  * The share button attached to a completed round.
  *
- * A message can carry either a reply keyboard or an inline keyboard, not both, so
- * the result replaces [commandsKeyboard] with this growth loop.
+ * The result is sent with [dev.inmo.tgbotapi.types.buttons.ReplyKeyboardRemove] so the
+ * move buttons disappear, then this inline keyboard is attached to the same message
+ * (see `TelegramGameIo.send`).
  */
 internal fun shareKeyboard(): InlineKeyboardMarkup =
     inlineKeyboard {
