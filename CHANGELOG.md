@@ -59,6 +59,8 @@ in `build.gradle.kts` is the source of truth for releases.
 - Score tracking retries schema initialization on the first game or stats request
   instead of staying disabled until a restart when the database was asleep or
   unreachable at startup.
+- Completed rounds dismiss the move-selection reply keyboard before showing the share
+  button, so the move buttons no longer linger after a result.
 
 ### Security
 

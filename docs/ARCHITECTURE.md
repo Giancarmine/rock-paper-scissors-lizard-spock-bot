@@ -146,8 +146,9 @@ Key points:
   played. `TelegramBot` records that result through `StatsService` after the reply is
   sent; cancellations, timeouts, and invalid attempts return `null` and are not
   counted. A missing or failing database never changes the game outcome.
-- A message can carry only one keyboard, so a completed round uses the inline share
-  keyboard instead of the reply command keyboard.
+- A message can carry only one keyboard, so a completed round sends the result with
+  `ReplyKeyboardRemove` to dismiss the move buttons, then attaches the inline share
+  keyboard to the same message with `editMessageReplyMarkup`.
 - In a group, `TelegramBot` reads the player's chat points and the chat leaderboard
   before the write and the leaderboard again after it, then posts at most one
   milestone. The before read is skipped in private chats and when scores are disabled.

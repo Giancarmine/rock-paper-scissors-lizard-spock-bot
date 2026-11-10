@@ -207,8 +207,9 @@ Application.kt                        main(): reads config, starts Ktor
    any command cancels the game. A timeout releases the lock with a clear message.
 5. The game service resolves the round and returns a typed `RoundResult`.
 6. `Messages.resultMessage(...)` renders both moves and the outcome; the bot sends it
-   with the inline share keyboard in a single message (a message cannot carry both a
-   reply keyboard and an inline keyboard).
+   with `ReplyKeyboardRemove` so the move buttons disappear, then attaches the inline
+   share keyboard to the same message (a message cannot carry both a reply keyboard and
+   an inline keyboard).
 7. `GameFlow.play` returns the `RoundResult` for a completed round, or `null` for a
    busy chat, timeout, cancellation, or too many invalid attempts. Only non-null
    results are recorded through `StatsService`, after the reply is sent. In a group,
