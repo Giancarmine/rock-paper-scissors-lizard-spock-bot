@@ -124,6 +124,12 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the rotation runbook.
   returns the nine-command menu. Inline mode still needs the owner's one-time
   `/setinline` in BotFather, and group milestone announcements are pending a check in
   a real group.
+- Render deploy `dep-dbpme6l6e07s73deni90` (commit `18939bd`, dismiss the move keyboard
+  when a round completes) reached **Live** at 18:51 UTC on 2026-11-10. Startup logged
+  `Synchronized 9 commands with Telegram` and `Score tracking is enabled.`,
+  `/healthz` returned `200`, `/readyz` returned `200 READY`, and `/openapi.yaml`
+  returned `200`. The owner still needs to play a round to confirm the move buttons
+  disappear and the Share button remains.
 - Runtime verification of the Telegram path: the Render logs show
   `Connected to Telegram as @RockPaperScissorsLizardSpockBot`, and `/readyz` returned
   `READY`. The owner also completed an interactive game and the stats commands.
